@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  GOFLAGS: -mod=readonly
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Vet
+        run: go vet ./...
+      - name: Tests and examples
+        run: go test ./...
+      - name: Production coverage
+        run: scripts/check-coverage.sh
+
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go test -race ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.11
+
+  fuzz-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go test -run '^$' -fuzz '^FuzzParsePath$' -fuzztime=10s .
+      - run: go test -run '^$' -fuzz '^FuzzMetadataAndListings$' -fuzztime=10s ./memory
+      - run: go test -run '^$' -fuzz '^FuzzLogicalKeyTranslation$' -fuzztime=10s ./s3
+      - run: go test -run '^$' -fuzz '^FuzzMalformedListingEntry$' -fuzztime=10s ./ftp
+      - run: go test -run '^$' -fuzz '^FuzzMalformedListingInfo$' -fuzztime=10s ./sftp
+
+  vulnerability-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+
+  api-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Compare with latest released module
+        shell: bash
+        run: |
+          baseline=$(go list -m -versions github.com/faustbrian/go-filesystem | awk '{print $NF}')
+          if [[ "$baseline" == "github.com/faustbrian/go-filesystem" ]]; then
+            echo "No released baseline exists yet; API diff starts with the first tag."
+            exit 0
+          fi
+          go run golang.org/x/exp/cmd/apidiff@v0.0.0-20260709172345-9ea1abe57597 \
+            -m "github.com/faustbrian/go-filesystem@$baseline" .
