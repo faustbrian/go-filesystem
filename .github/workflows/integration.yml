@@ -1,0 +1,63 @@
+name: Adapter integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+env:
+  GOFLAGS: -mod=readonly
+
+jobs:
+  local-and-protocol:
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [local, memory, sftp, ftp]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go test -count=1 "./${{ matrix.package }}"
+
+  s3-compatible:
+    runs-on: ubuntu-latest
+    env:
+      MINIO_IMAGE: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+      S3_INTEGRATION_ENDPOINT: http://127.0.0.1:9000
+      S3_INTEGRATION_ACCESS_KEY: filesystem-access
+      S3_INTEGRATION_SECRET_KEY: filesystem-secret-key
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Start pinned S3-compatible service
+        run: |
+          docker run --detach --rm --name filesystem-minio \
+            --publish 9000:9000 \
+            --env MINIO_ROOT_USER="$S3_INTEGRATION_ACCESS_KEY" \
+            --env MINIO_ROOT_PASSWORD="$S3_INTEGRATION_SECRET_KEY" \
+            "$MINIO_IMAGE" server /data
+          for _ in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:9000/minio/health/ready; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs filesystem-minio
+          exit 1
+      - name: S3 and R2 conformance
+        run: go test -count=1 -run TestCompatibleServiceConformance ./s3 ./r2
+      - name: Service logs
+        if: always()
+        run: docker logs filesystem-minio || true
