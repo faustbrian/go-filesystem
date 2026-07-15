@@ -21,7 +21,7 @@ jobs:
         package: [local, memory, sftp, ftp]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -36,7 +36,7 @@ jobs:
       S3_INTEGRATION_ACCESS_KEY: filesystem-access
       S3_INTEGRATION_SECRET_KEY: filesystem-secret-key
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
