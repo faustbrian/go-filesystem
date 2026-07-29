@@ -36,6 +36,7 @@ type fakeRoot struct {
 	lstatErr  error
 	mkdirErr  error
 	removeErr error
+	linkErr   error
 	renameErr error
 	fsys      fs.FS
 	closeErr  error
@@ -49,6 +50,7 @@ func (r *fakeRoot) Stat(string) (fs.FileInfo, error)   { return r.statInfo, r.st
 func (r *fakeRoot) Lstat(string) (fs.FileInfo, error)  { return r.lstatInfo, r.lstatErr }
 func (r *fakeRoot) MkdirAll(string, fs.FileMode) error { return r.mkdirErr }
 func (r *fakeRoot) Remove(string) error                { return r.removeErr }
+func (r *fakeRoot) Link(string, string) error          { return r.linkErr }
 func (r *fakeRoot) Rename(string, string) error        { return r.renameErr }
 func (r *fakeRoot) FS() fs.FS                          { return r.fsys }
 func (r *fakeRoot) Close() error                       { return r.closeErr }
@@ -151,6 +153,8 @@ func TestWriteInjectedPublicationFailures(t *testing.T) {
 		{name: "write", root: &fakeRoot{create: &fakeFile{writeErr: errInjected}}},
 		{name: "sync", root: &fakeRoot{create: &fakeFile{syncErr: errInjected}}},
 		{name: "close", root: &fakeRoot{create: &fakeFile{closeErr: errInjected}}},
+		{name: "link", root: &fakeRoot{create: &fakeFile{}, statErr: fs.ErrNotExist, linkErr: errInjected}},
+		{name: "remove published temporary", root: &fakeRoot{create: &fakeFile{}, statErr: fs.ErrNotExist, removeErr: errInjected}},
 		{name: "rename", root: &fakeRoot{create: &fakeFile{}, renameErr: errInjected}},
 		{name: "final stat", root: &fakeRoot{create: &fakeFile{}, statErr: errInjected}},
 	}
@@ -161,7 +165,8 @@ func TestWriteInjectedPublicationFailures(t *testing.T) {
 				adapter.random = test.random
 			}
 			options := filesystem.WriteOptions{}
-			if test.name == "precondition stat" {
+			switch test.name {
+			case "precondition stat", "link", "remove published temporary":
 				options.IfNoneMatch = true
 			}
 			_, err := adapter.Write(context.Background(), path, strings.NewReader("content"), options)

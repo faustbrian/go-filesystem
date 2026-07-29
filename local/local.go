@@ -70,6 +70,7 @@ type rootFS interface {
 	Lstat(string) (fs.FileInfo, error)
 	MkdirAll(string, fs.FileMode) error
 	Remove(string) error
+	Link(string, string) error
 	Rename(string, string) error
 	FS() fs.FS
 	Close() error
@@ -257,7 +258,21 @@ func (a *Adapter) Write(ctx context.Context, logicalPath filesystem.Path, source
 	if err := file.Close(); err != nil {
 		return filesystem.Metadata{}, fmt.Errorf("local: close temporary file: %w", err)
 	}
-	if err := a.root.Rename(temporary, logicalPath.String()); err != nil {
+	if options.IfNoneMatch {
+		if err := a.root.Link(temporary, logicalPath.String()); err != nil {
+			if errors.Is(err, fs.ErrExist) {
+				return filesystem.Metadata{}, fmt.Errorf(
+					"%w: %s",
+					filesystem.ErrPreconditionFailed,
+					logicalPath,
+				)
+			}
+			return filesystem.Metadata{}, fmt.Errorf("local: publish temporary file: %w", err)
+		}
+		if err := a.root.Remove(temporary); err != nil {
+			return filesystem.Metadata{}, fmt.Errorf("local: remove published temporary file: %w", err)
+		}
+	} else if err := a.root.Rename(temporary, logicalPath.String()); err != nil {
 		return filesystem.Metadata{}, fmt.Errorf("local: publish temporary file: %w", err)
 	}
 	committed = true
@@ -618,6 +633,7 @@ func (r osRoot) MkdirAll(name string, mode fs.FileMode) error {
 	return r.root.MkdirAll(name, mode)
 }
 func (r osRoot) Remove(name string) error             { return r.root.Remove(name) }
+func (r osRoot) Link(oldName, newName string) error   { return r.root.Link(oldName, newName) }
 func (r osRoot) Rename(oldName, newName string) error { return r.root.Rename(oldName, newName) }
 func (r osRoot) FS() fs.FS                            { return r.root.FS() }
 func (r osRoot) Close() error                         { return r.root.Close() }

@@ -3,14 +3,66 @@ package local_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	filesystem "github.com/faustbrian/golib/pkg/filesystem"
 	"github.com/faustbrian/golib/pkg/filesystem/local"
 )
+
+func TestConcurrentCreateOnlyWritesPublishExactlyOnce(t *testing.T) {
+	t.Parallel()
+
+	adapter, err := local.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = adapter.Close() })
+
+	const writers = 16
+	path := filesystem.MustParsePath("immutable/report.bin")
+	release := make(chan struct{})
+	ready := make(chan struct{}, writers)
+	var succeeded atomic.Int64
+	var conflicted atomic.Int64
+	var failures atomic.Int64
+	var group sync.WaitGroup
+	for index := range writers {
+		group.Add(1)
+		go func(value byte) {
+			defer group.Done()
+			_, writeErr := adapter.Write(
+				context.Background(),
+				path,
+				&barrierReader{ready: ready, release: release, payload: []byte{value}},
+				filesystem.WriteOptions{IfNoneMatch: true},
+			)
+			switch {
+			case writeErr == nil:
+				succeeded.Add(1)
+			case errors.Is(writeErr, filesystem.ErrPreconditionFailed):
+				conflicted.Add(1)
+			default:
+				failures.Add(1)
+			}
+		}(byte(index))
+	}
+	for range writers {
+		<-ready
+	}
+	close(release)
+	group.Wait()
+	if succeeded.Load() != 1 || conflicted.Load() != writers-1 || failures.Load() != 0 {
+		t.Fatalf(
+			"create-only results: succeeded=%d conflicted=%d failed=%d",
+			succeeded.Load(), conflicted.Load(), failures.Load(),
+		)
+	}
+}
 
 func TestConcurrentReadersObserveCompleteAtomicWrites(t *testing.T) {
 	t.Parallel()
@@ -107,4 +159,25 @@ func TestConcurrentReadersObserveCompleteAtomicWrites(t *testing.T) {
 		t.Fatal(err)
 	default:
 	}
+}
+
+type barrierReader struct {
+	ready   chan<- struct{}
+	release <-chan struct{}
+	payload []byte
+	once    sync.Once
+}
+
+func (reader *barrierReader) Read(buffer []byte) (int, error) {
+	reader.once.Do(func() {
+		reader.ready <- struct{}{}
+		<-reader.release
+	})
+	if len(reader.payload) == 0 {
+		return 0, io.EOF
+	}
+	count := copy(buffer, reader.payload)
+	reader.payload = reader.payload[count:]
+
+	return count, nil
 }

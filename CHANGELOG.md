@@ -6,6 +6,11 @@ Versioning after its first release.
 
 ## [Unreleased]
 
+### Fixed
+
+- Make local create-only writes publish with an atomic hard-link operation so
+  concurrent `IfNoneMatch` writers cannot overwrite the first object.
+
 ### Compatibility
 
 - Added a pinned module export baseline so incompatible public API changes
