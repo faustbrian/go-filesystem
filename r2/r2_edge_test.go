@@ -63,6 +63,32 @@ func TestOptionsReachR2Transport(t *testing.T) {
 	}
 }
 
+func TestLimitValidationBoundaries(t *testing.T) {
+	t.Parallel()
+
+	valid := settings{maxListEntries: 1, maxMetadataEntries: 1, maxMetadataBytes: 1}
+	if err := validateLimits(valid); err != nil {
+		t.Fatalf("validateLimits(valid) = %v", err)
+	}
+	for _, test := range []struct {
+		name   string
+		mutate func(*settings)
+	}{
+		{name: "zero list", mutate: func(value *settings) { value.maxListEntries = 0 }},
+		{name: "negative list", mutate: func(value *settings) { value.maxListEntries = -1 }},
+		{name: "zero metadata entries", mutate: func(value *settings) { value.maxMetadataEntries = 0 }},
+		{name: "negative metadata entries", mutate: func(value *settings) { value.maxMetadataEntries = -1 }},
+		{name: "zero metadata bytes", mutate: func(value *settings) { value.maxMetadataBytes = 0 }},
+		{name: "negative metadata bytes", mutate: func(value *settings) { value.maxMetadataBytes = -1 }},
+	} {
+		value := valid
+		test.mutate(&value)
+		if err := validateLimits(value); err == nil {
+			t.Errorf("validateLimits(%s) error = nil", test.name)
+		}
+	}
+}
+
 func TestEndpointValidationMatrix(t *testing.T) {
 	t.Parallel()
 

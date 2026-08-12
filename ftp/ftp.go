@@ -13,7 +13,7 @@ import (
 	"io"
 	"net"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -152,7 +152,7 @@ func New(ctx context.Context, configuration Config) (*Adapter, error) {
 		if configuration.TLSConfig.InsecureSkipVerify {
 			return nil, errors.New("ftp: TLS certificate verification must be enabled")
 		}
-		if configuration.TLSConfig.MinVersion != 0 && configuration.TLSConfig.MinVersion < tls.VersionTLS12 {
+		if invalidTLSMinimum(configuration.TLSConfig.MinVersion) {
 			return nil, errors.New("ftp: minimum TLS version must be TLS 1.2 or newer")
 		}
 		return nil, errors.New("ftp: TLS data transfers are not supported by the pinned protocol client")
@@ -161,25 +161,18 @@ func New(ctx context.Context, configuration Config) (*Adapter, error) {
 	if err != nil {
 		return nil, err
 	}
-	timeout := configuration.Timeout
-	if timeout == 0 {
-		timeout = 30 * time.Second
-	}
-	if timeout < 0 {
+	if configuration.Timeout < 0 {
 		return nil, errors.New("ftp: timeout must not be negative")
 	}
-	maxList := configuration.MaxListEntries
-	if maxList == 0 {
-		maxList = 10_000
-	}
-	if maxList < 0 {
+	if configuration.MaxListEntries < 0 {
 		return nil, errors.New("ftp: maximum list entries must be positive")
 	}
+	timeout := defaultTimeout(configuration.Timeout)
+	maxList := defaultMaxList(configuration.MaxListEntries)
 
 	options := []protocol.Option{protocol.WithTimeout(timeout)}
-	if configuration.DataMode == Active {
-		options = append(options, protocol.WithActiveMode())
-	}
+	dataModeOptions := [2][]protocol.Option{nil, {protocol.WithActiveMode()}}
+	options = append(options, dataModeOptions[configuration.DataMode]...)
 	if configuration.DisableEPSV {
 		options = append(options, protocol.WithDisableEPSV())
 	}
@@ -324,14 +317,15 @@ func (a *Adapter) Write(ctx context.Context, logicalPath filesystem.Path, source
 	if options.IfNoneMatch {
 		return filesystem.Metadata{}, filesystem.Unsupported("ftp", filesystem.CapabilityWrite, filesystem.OperationWrite)
 	}
-	a.opMu.Lock()
-	session, err := a.currentSession(ctx)
-	if err != nil {
-		a.opMu.Unlock()
-		return filesystem.Metadata{}, err
-	}
-	err = a.write(ctx, session, logicalPath, source)
-	a.opMu.Unlock()
+	err := func() error {
+		a.opMu.Lock()
+		defer a.opMu.Unlock()
+		session, err := a.currentSession(ctx)
+		if err != nil {
+			return err
+		}
+		return a.write(ctx, session, logicalPath, source)
+	}()
 	if err != nil {
 		return filesystem.Metadata{}, mapError(logicalPath, err)
 	}
@@ -389,10 +383,13 @@ func (a *Adapter) write(ctx context.Context, session remoteSession, logicalPath 
 // the outcome ambiguous.
 func (a *Adapter) Delete(ctx context.Context, logicalPath filesystem.Path) error {
 	return a.withLocked(ctx, false, func(session remoteSession) error {
-		if err := a.rejectLink(session, logicalPath, true); err != nil {
+		err := a.rejectLink(session, logicalPath, true)
+		switch err {
+		case nil:
+			return session.Delete(a.remotePath(logicalPath))
+		default:
 			return err
 		}
-		return session.Delete(a.remotePath(logicalPath))
 	}, logicalPath)
 }
 
@@ -420,17 +417,14 @@ func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options f
 	if options.Limit < 0 {
 		return nil, errors.New("ftp: list limit must not be negative")
 	}
-	limit := options.Limit
-	if limit == 0 || limit > a.maxList {
-		limit = a.maxList
-	}
+	limit := effectiveListLimit(options.Limit, a.maxList)
 	entries, err := withLockedResult(a, ctx, true, func(session remoteSession) ([]filesystem.Entry, error) {
 		return a.list(ctx, session, directory, options.Recursive, limit)
 	})
 	if err != nil {
 		return nil, mapError(directory, err)
 	}
-	return &iterator{entries: entries, index: -1}, nil
+	return &iterator{entries: entries}, nil
 }
 
 func (a *Adapter) list(ctx context.Context, session remoteSession, directory filesystem.Path, recursive bool, limit int) ([]filesystem.Entry, error) {
@@ -441,7 +435,7 @@ func (a *Adapter) list(ctx context.Context, session remoteSession, directory fil
 	}
 	queue := []filesystem.Path{directory}
 	entries := make([]filesystem.Entry, 0, min(limit, 128))
-	for len(queue) > 0 && len(entries) < limit {
+	for len(queue) > 0 {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -451,7 +445,9 @@ func (a *Adapter) list(ctx context.Context, session remoteSession, directory fil
 		if err != nil {
 			return nil, err
 		}
-		sort.Slice(children, func(left, right int) bool { return children[left].Name < children[right].Name })
+		slices.SortFunc(children, func(left, right remoteEntry) int {
+			return strings.Compare(left.Name, right.Name)
+		})
 		for _, child := range children {
 			if child.Link {
 				return nil, fmt.Errorf("ftp: symbolic link %q is denied", child.Name)
@@ -468,13 +464,20 @@ func (a *Adapter) list(ctx context.Context, session remoteSession, directory fil
 				}
 			}
 			entries = append(entries, filesystem.Entry{Path: logicalPath, Kind: kind, Size: child.Size, Modified: child.Modified})
-			if len(entries) == limit {
-				break
+			if len(entries) >= limit {
+				sortEntries(entries)
+				return entries, nil
 			}
 		}
 	}
-	sort.Slice(entries, func(left, right int) bool { return entries[left].Path.String() < entries[right].Path.String() })
+	sortEntries(entries)
 	return entries, nil
+}
+
+func sortEntries(entries []filesystem.Entry) {
+	slices.SortFunc(entries, func(left, right filesystem.Entry) int {
+		return strings.Compare(left.Path.String(), right.Path.String())
+	})
 }
 
 // Copy is unsupported because FTP has no portable server-side copy primitive.
@@ -530,7 +533,10 @@ func withLockedResult[T any](a *Adapter, ctx context.Context, retry bool, operat
 		return zero, err
 	}
 	result, err := operation(session)
-	if err == nil || !retry || !isConnectionError(err) {
+	if err == nil {
+		return result, nil
+	}
+	if !retry || !isConnectionError(err) {
 		return result, err
 	}
 	a.invalidate(session)
@@ -581,10 +587,11 @@ func (a *Adapter) abortTransfer() {
 
 func (a *Adapter) rejectLink(session remoteSession, logicalPath filesystem.Path, includeFinal bool) error {
 	segments := strings.Split(logicalPath.String(), "/")
-	if !includeFinal && len(segments) > 0 {
-		segments = segments[:len(segments)-1]
+	segmentCount := len(segments)
+	if !includeFinal {
+		segmentCount--
 	}
-	for index := range segments {
+	for index := range segments[:segmentCount] {
 		candidate := path.Join(a.root, path.Join(segments[:index+1]...))
 		entry, err := session.Stat(candidate)
 		if isNotFound(err) {
@@ -637,7 +644,7 @@ type readStream struct {
 func (s *readStream) transfer(session remoteSession, writer *io.PipeWriter, logicalPath filesystem.Path) {
 	counting := &countingWriter{writer: writer}
 	err := session.Retrieve(s.adapter.remotePath(logicalPath), counting)
-	if isConnectionError(err) && counting.count == 0 && s.ctx.Err() == nil {
+	if isConnectionError(err) && !counting.wroteAny && s.ctx.Err() == nil {
 		s.adapter.invalidate(session)
 		if reconnected, reconnectErr := s.adapter.currentSession(s.ctx); reconnectErr == nil {
 			err = reconnected.Retrieve(s.adapter.remotePath(logicalPath), counting)
@@ -663,10 +670,12 @@ func (s *readStream) watchCancellation() {
 }
 
 func (s *readStream) Read(buffer []byte) (int, error) {
-	if err := s.ctx.Err(); err != nil {
-		return 0, err
+	select {
+	case <-s.ctx.Done():
+		return 0, s.ctx.Err()
+	default:
+		return s.reader.Read(buffer)
 	}
-	return s.reader.Read(buffer)
 }
 
 func (s *readStream) Close() error {
@@ -679,13 +688,13 @@ func (s *readStream) Close() error {
 }
 
 type countingWriter struct {
-	writer io.Writer
-	count  int64
+	writer   io.Writer
+	wroteAny bool
 }
 
 func (w *countingWriter) Write(buffer []byte) (int, error) {
 	written, err := w.writer.Write(buffer)
-	w.count += int64(written)
+	w.wroteAny = w.wroteAny || written > 0
 	return written, err
 }
 
@@ -695,31 +704,36 @@ type contextReader struct {
 }
 
 func (r contextReader) Read(buffer []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
+	select {
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	default:
+		return r.reader.Read(buffer)
 	}
-	return r.reader.Read(buffer)
 }
 
 type iterator struct {
-	entries []filesystem.Entry
-	index   int
-	closed  bool
+	entries    []filesystem.Entry
+	current    filesystem.Entry
+	hasCurrent bool
+	closed     bool
 }
 
 func (i *iterator) Next() bool {
-	if i.closed || i.index+1 >= len(i.entries) {
+	if i.closed || len(i.entries) == 0 {
 		return false
 	}
-	i.index++
+	i.current = i.entries[0]
+	i.entries = i.entries[1:]
+	i.hasCurrent = true
 	return true
 }
 
 func (i *iterator) Entry() filesystem.Entry {
-	if i.index < 0 || i.index >= len(i.entries) {
+	if !i.hasCurrent {
 		return filesystem.Entry{}
 	}
-	return i.entries[i.index]
+	return i.current
 }
 
 func (i *iterator) Err() error { return nil }
@@ -730,8 +744,22 @@ func (i *iterator) Close() error {
 }
 
 type realSession struct {
-	client          *protocol.Client
+	client          protocolClient
 	machineListings bool
+}
+
+type protocolClient interface {
+	Retrieve(string, io.Writer) error
+	Store(string, io.Reader) error
+	MLStat(string) (*protocol.MLEntry, error)
+	List(string) ([]*protocol.Entry, error)
+	ModTime(string) (time.Time, error)
+	MLList(string) ([]*protocol.MLEntry, error)
+	MakeDir(string) error
+	Delete(string) error
+	Rename(string, string) error
+	Abort() error
+	Quit() error
 }
 
 func (s *realSession) Retrieve(name string, destination io.Writer) error {
@@ -744,13 +772,7 @@ func (s *realSession) Stat(name string) (remoteEntry, error) {
 	if s.machineListings {
 		entry, err := s.client.MLStat(name)
 		if err == nil {
-			return remoteEntry{
-				Name:      entry.Name,
-				Size:      entry.Size,
-				Modified:  entry.ModTime,
-				Directory: entry.Type == "dir" || entry.Type == "cdir" || entry.Type == "pdir",
-				Link:      entry.Type == "link",
-			}, nil
+			return machineEntry(entry), nil
 		}
 	}
 	parent := path.Dir(name)
@@ -762,13 +784,7 @@ func (s *realSession) Stat(name string) (remoteEntry, error) {
 	for _, entry := range entries {
 		if entry.Name == base {
 			modified, _ := s.client.ModTime(name)
-			return remoteEntry{
-				Name:      entry.Name,
-				Size:      entry.Size,
-				Modified:  modified,
-				Directory: entry.Type == "dir",
-				Link:      entry.Type == "link",
-			}, nil
+			return listEntry(entry, modified), nil
 		}
 	}
 	return remoteEntry{}, errFileUnavailable
@@ -786,12 +802,7 @@ func (s *realSession) List(name string) ([]remoteEntry, error) {
 	}
 	result := make([]remoteEntry, 0, len(entries))
 	for _, entry := range entries {
-		result = append(result, remoteEntry{
-			Name:      entry.Name,
-			Size:      entry.Size,
-			Directory: entry.Type == "dir",
-			Link:      entry.Type == "link",
-		})
+		result = append(result, listEntry(entry, time.Time{}))
 	}
 	return result, nil
 }
@@ -802,15 +813,29 @@ func machineListEntries(entries []*protocol.MLEntry) []remoteEntry {
 		if entry.Type == "cdir" || entry.Type == "pdir" {
 			continue
 		}
-		result = append(result, remoteEntry{
-			Name:      entry.Name,
-			Size:      entry.Size,
-			Modified:  entry.ModTime,
-			Directory: entry.Type == "dir",
-			Link:      entry.Type == "link",
-		})
+		result = append(result, machineEntry(entry))
 	}
 	return result
+}
+
+func machineEntry(entry *protocol.MLEntry) remoteEntry {
+	return remoteEntry{
+		Name:      entry.Name,
+		Size:      entry.Size,
+		Modified:  entry.ModTime,
+		Directory: entry.Type == "dir" || entry.Type == "cdir" || entry.Type == "pdir",
+		Link:      entry.Type == "link",
+	}
+}
+
+func listEntry(entry *protocol.Entry, modified time.Time) remoteEntry {
+	return remoteEntry{
+		Name:      entry.Name,
+		Size:      entry.Size,
+		Modified:  modified,
+		Directory: entry.Type == "dir",
+		Link:      entry.Type == "link",
+	}
 }
 func (s *realSession) MakeDir(name string) error { return s.client.MakeDir(name) }
 func (s *realSession) Delete(name string) error  { return s.client.Delete(name) }
@@ -863,6 +888,31 @@ func supportsMachineListings(features map[string]string) bool {
 	_, hasMLST := features["MLST"]
 	_, hasMLSD := features["MLSD"]
 	return hasMLST || hasMLSD
+}
+
+func invalidTLSMinimum(version uint16) bool {
+	return version != 0 && version < tls.VersionTLS12
+}
+
+func defaultTimeout(timeout time.Duration) time.Duration {
+	if timeout == 0 {
+		return 30 * time.Second
+	}
+	return timeout
+}
+
+func defaultMaxList(limit int) int {
+	if limit == 0 {
+		return 10_000
+	}
+	return limit
+}
+
+func effectiveListLimit(requested, maximum int) int {
+	if requested == 0 {
+		return maximum
+	}
+	return min(requested, maximum)
 }
 
 func validateRoot(root string) (string, error) {

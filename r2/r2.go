@@ -170,11 +170,8 @@ func newWithLoader(
 	if err != nil {
 		return nil, err
 	}
-	if configurationOptions.maxListEntries <= 0 {
-		return nil, errors.New("r2: maximum list entries must be positive")
-	}
-	if configurationOptions.maxMetadataEntries <= 0 || configurationOptions.maxMetadataBytes <= 0 {
-		return nil, errors.New("r2: metadata limits must be positive")
+	if err := validateLimits(configurationOptions); err != nil {
+		return nil, err
 	}
 
 	loadOptions := []func(*awsconfig.LoadOptions) error{
@@ -209,9 +206,7 @@ func newWithLoader(
 	if configuration.Prefix != "" {
 		transportOptions = append(transportOptions, filesystemS3.WithPrefix(configuration.Prefix))
 	}
-	if len(configurationOptions.transferOptions) > 0 {
-		transportOptions = append(transportOptions, filesystemS3.WithTransferOptions(configurationOptions.transferOptions...))
-	}
+	transportOptions = append(transportOptions, filesystemS3.WithTransferOptions(configurationOptions.transferOptions...))
 	transport, err := filesystemS3.NewR2Transport(client, configuration.Bucket, transportOptions...)
 	if err != nil {
 		return nil, err
@@ -228,6 +223,19 @@ func newWithLoader(
 			MultipartRequiresUniformPartSize: true,
 		},
 	}, nil
+}
+
+func validateLimits(configuration settings) error {
+	if configuration.maxListEntries <= 0 {
+		return errors.New("r2: maximum list entries must be positive")
+	}
+	if configuration.maxMetadataEntries <= 0 {
+		return errors.New("r2: maximum metadata entries must be positive")
+	}
+	if configuration.maxMetadataBytes <= 0 {
+		return errors.New("r2: maximum metadata bytes must be positive")
+	}
+	return nil
 }
 
 // Profile returns immutable R2-specific transport and semantic guarantees.

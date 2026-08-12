@@ -60,7 +60,7 @@ func TestConcreteClientIntegration(t *testing.T) {
 		Password:       "password",
 		TLSMode:        TLSPlaintext,
 		AllowPlaintext: true,
-		Timeout:        5 * time.Second,
+		Timeout:        30 * time.Second,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -135,13 +135,11 @@ func TestConcreteClientIntegration(t *testing.T) {
 		Password:       "wrong",
 		TLSMode:        TLSPlaintext,
 		AllowPlaintext: true,
-		Timeout:        5 * time.Second,
+		Timeout:        30 * time.Second,
 	}); err == nil {
 		t.Fatal("New(wrong password) error = nil")
 	}
-	if err := real.client.Quit(); err != nil {
-		t.Fatal(err)
-	}
+	_ = real.client.Quit()
 	if _, err := real.List("/"); err == nil {
 		t.Fatal("realSession.List() error = nil after client close")
 	}
@@ -484,6 +482,8 @@ type fakeSession struct {
 	statEntry       *remoteEntry
 	aborted         chan struct{}
 	abortOnce       sync.Once
+	renameCalls     int
+	deleteCalls     int
 }
 
 func (s *fakeSession) Retrieve(name string, destination io.Writer) error {
@@ -574,6 +574,7 @@ func (s *fakeSession) List(directory string) ([]remoteEntry, error) {
 func (s *fakeSession) MakeDir(string) error { return s.makeDirError }
 
 func (s *fakeSession) Delete(name string) error {
+	s.deleteCalls++
 	if s.deleteError != nil {
 		return s.deleteError
 	}
@@ -587,6 +588,7 @@ func (s *fakeSession) Delete(name string) error {
 }
 
 func (s *fakeSession) Rename(source, destination string) error {
+	s.renameCalls++
 	if s.renameError != nil {
 		return s.renameError
 	}

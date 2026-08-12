@@ -71,6 +71,57 @@ func TestConstructorOptionAndInternalValidation(t *testing.T) {
 	}
 }
 
+func TestConfigurationBoundaryNormalization(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name    string
+		version uint16
+		invalid bool
+	}{
+		{name: "unspecified", version: 0},
+		{name: "TLS 1.1", version: tls.VersionTLS11, invalid: true},
+		{name: "TLS 1.2", version: tls.VersionTLS12},
+		{name: "TLS 1.3", version: tls.VersionTLS13},
+	} {
+		if got := invalidTLSMinimum(test.version); got != test.invalid {
+			t.Errorf("invalidTLSMinimum(%s) = %t, want %t", test.name, got, test.invalid)
+		}
+	}
+	if got := defaultTimeout(0); got != 30*time.Second {
+		t.Fatalf("defaultTimeout(0) = %s", got)
+	}
+	if got := defaultTimeout(time.Nanosecond); got != time.Nanosecond {
+		t.Fatalf("defaultTimeout(1ns) = %s", got)
+	}
+	if got := defaultMaxList(0); got != 10_000 {
+		t.Fatalf("defaultMaxList(0) = %d", got)
+	}
+	if got := defaultMaxList(1); got != 1 {
+		t.Fatalf("defaultMaxList(1) = %d", got)
+	}
+	for _, test := range []struct {
+		requested int
+		want      int
+	}{
+		{requested: 0, want: 100},
+		{requested: 1, want: 1},
+		{requested: 100, want: 100},
+		{requested: 101, want: 100},
+	} {
+		if got := effectiveListLimit(test.requested, 100); got != test.want {
+			t.Errorf("effectiveListLimit(%d, 100) = %d, want %d", test.requested, got, test.want)
+		}
+	}
+
+	connector := func(context.Context) (remoteSession, error) { return nil, errInjected }
+	for _, limit := range []int{0, -1} {
+		if _, err := newAdapter(context.Background(), connector, "/", limit, Profile{}); err == nil || err.Error() != "ftp: maximum list entries must be positive" {
+			t.Fatalf("newAdapter(limit %d) error = %v", limit, err)
+		}
+	}
+}
+
 func TestCloseAndSessionStateFailures(t *testing.T) {
 	t.Parallel()
 
@@ -239,6 +290,33 @@ func TestWriteFailureMatrix(t *testing.T) {
 	}
 }
 
+func TestWriteRenamesExactlyOnceAndReleasesLockOnSessionFailure(t *testing.T) {
+	t.Parallel()
+
+	state := newFakeState()
+	session := &fakeSession{state: state}
+	adapter := testFTPAdapter(t, session)
+	logicalPath := filesystem.MustParsePath("directory/object")
+	if _, err := adapter.Write(context.Background(), logicalPath, strings.NewReader("content"), filesystem.WriteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if session.renameCalls != 1 || session.deleteCalls != 0 {
+		t.Fatalf("rename calls = %d, delete calls = %d", session.renameCalls, session.deleteCalls)
+	}
+
+	closed := testFTPAdapter(t, &fakeSession{state: newFakeState()})
+	if err := closed.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	for range 2 {
+		if _, err := closed.Write(ctx, logicalPath, strings.NewReader("content"), filesystem.WriteOptions{}); !errors.Is(err, net.ErrClosed) {
+			t.Fatalf("Write(closed) error = %v", err)
+		}
+	}
+}
+
 func TestDeleteStatListAndUnsupportedEdges(t *testing.T) {
 	t.Parallel()
 
@@ -252,9 +330,22 @@ func TestDeleteStatListAndUnsupportedEdges(t *testing.T) {
 		{state: newFakeState(), statEntry: &remoteEntry{Link: true}},
 		{state: newFakeState(), deleteError: errInjected},
 	} {
-		if err := testFTPAdapter(t, session).Delete(context.Background(), path); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		if err := testFTPAdapter(t, session).Delete(ctx, path); err == nil {
+			cancel()
 			t.Fatal("Delete() error = nil")
 		}
+		cancel()
+	}
+	linkSession := &fakeSession{state: newFakeState(), statEntry: &remoteEntry{Link: true}}
+	if err := testFTPAdapter(t, linkSession).Delete(context.Background(), path); err == nil || linkSession.deleteCalls != 0 {
+		t.Fatalf("Delete(link) error = %v, delete calls = %d", err, linkSession.deleteCalls)
+	}
+	deleteState := newFakeState()
+	deleteState.objects["/storage/object"] = []byte("content")
+	deleteSession := &fakeSession{state: deleteState}
+	if err := testFTPAdapter(t, deleteSession).Delete(context.Background(), path); err != nil || deleteSession.deleteCalls != 1 {
+		t.Fatalf("Delete(object) error = %v, delete calls = %d", err, deleteSession.deleteCalls)
 	}
 	directory := remoteEntry{Name: "directory", Directory: true}
 	metadata, err := testFTPAdapter(t, &fakeSession{state: newFakeState(), statEntry: &directory}).Stat(context.Background(), path)
@@ -292,6 +383,18 @@ func TestDeleteStatListAndUnsupportedEdges(t *testing.T) {
 	}
 	if err := iterator.Close(); err != nil || iterator.Next() {
 		t.Fatalf("Close() = %v", err)
+	}
+	unsorted := &fakeSession{state: newFakeState(), listEntries: []remoteEntry{{Name: "z"}, {Name: "a"}, {Name: "m"}}}
+	iterator, err = testFTPAdapter(t, unsorted).List(context.Background(), filesystem.Root(), filesystem.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var listed []string
+	for iterator.Next() {
+		listed = append(listed, iterator.Entry().Path.String())
+	}
+	if strings.Join(listed, ",") != "a,m,z" {
+		t.Fatalf("sorted listing = %v", listed)
 	}
 	adapter := testFTPAdapter(t, &fakeSession{state: newFakeState()})
 	for _, call := range []func() error{
@@ -382,6 +485,159 @@ func TestLockReconnectDirectoryAndHelperEdges(t *testing.T) {
 	}
 }
 
+func TestRetryDecisionMatrix(t *testing.T) {
+	t.Parallel()
+
+	state := newFakeState()
+	for _, test := range []struct {
+		name       string
+		retry      bool
+		firstError error
+		wantCalls  int
+		wantResult string
+		wantError  error
+	}{
+		{name: "success", retry: true, wantCalls: 1, wantResult: "first"},
+		{name: "retry disabled", firstError: io.EOF, wantCalls: 1, wantResult: "first", wantError: io.EOF},
+		{name: "not connection", retry: true, firstError: errInjected, wantCalls: 1, wantResult: "first", wantError: errInjected},
+		{name: "connection retry", retry: true, firstError: io.EOF, wantCalls: 2, wantResult: "second"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			connector := &scriptedConnector{sessions: []remoteSession{
+				&fakeSession{state: state},
+				&fakeSession{state: state},
+			}}
+			adapter, err := newAdapter(context.Background(), connector.Connect, "/storage", 1, Profile{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			result, callErr := withLockedResult(adapter, context.Background(), test.retry, func(remoteSession) (string, error) {
+				calls++
+				if calls == 1 {
+					return "first", test.firstError
+				}
+				return "second", nil
+			})
+			if result != test.wantResult || !errors.Is(callErr, test.wantError) || calls != test.wantCalls {
+				t.Fatalf("result = %q, error = %v, calls = %d", result, callErr, calls)
+			}
+		})
+	}
+}
+
+func TestWriterIteratorAndEntryBoundaries(t *testing.T) {
+	t.Parallel()
+
+	counting := &countingWriter{writer: io.Discard}
+	if written, err := counting.Write(nil); written != 0 || err != nil || counting.wroteAny {
+		t.Fatalf("empty write = %d, %v, wroteAny %t", written, err, counting.wroteAny)
+	}
+	if written, err := counting.Write([]byte("x")); written != 1 || err != nil || !counting.wroteAny {
+		t.Fatalf("data write = %d, %v, wroteAny %t", written, err, counting.wroteAny)
+	}
+
+	entry := filesystem.Entry{Path: filesystem.MustParsePath("object")}
+	iterator := &iterator{entries: []filesystem.Entry{entry}}
+	if got := iterator.Entry(); !got.Path.IsRoot() {
+		t.Fatalf("Entry(before Next) = %+v", got)
+	}
+	if !iterator.Next() || iterator.Entry().Path != entry.Path || iterator.Next() {
+		t.Fatal("iterator did not expose exactly one entry")
+	}
+	if got := iterator.Entry(); got.Path != entry.Path {
+		t.Fatalf("Entry(after exhaustion) = %+v", got)
+	}
+	if err := iterator.Close(); err != nil || iterator.Next() {
+		t.Fatalf("Close() = %v", err)
+	}
+
+	modified := fixedTime()
+	for _, test := range []struct {
+		kind      string
+		directory bool
+		link      bool
+	}{
+		{kind: "file"},
+		{kind: "dir", directory: true},
+		{kind: "cdir", directory: true},
+		{kind: "pdir", directory: true},
+		{kind: "link", link: true},
+	} {
+		got := machineEntry(&protocol.MLEntry{Name: "name", Type: test.kind, Size: 7, ModTime: modified})
+		if got.Name != "name" || got.Size != 7 || got.Modified != modified || got.Directory != test.directory || got.Link != test.link {
+			t.Errorf("machineEntry(%q) = %+v", test.kind, got)
+		}
+	}
+	for _, test := range []struct {
+		kind      string
+		directory bool
+		link      bool
+	}{
+		{kind: "file"},
+		{kind: "dir", directory: true},
+		{kind: "link", link: true},
+	} {
+		got := listEntry(&protocol.Entry{Name: "name", Type: test.kind, Size: 7}, modified)
+		if got.Name != "name" || got.Size != 7 || got.Modified != modified || got.Directory != test.directory || got.Link != test.link {
+			t.Errorf("listEntry(%q) = %+v", test.kind, got)
+		}
+	}
+}
+
+func TestRealSessionMachineAndLegacyListingBranches(t *testing.T) {
+	t.Parallel()
+
+	modified := fixedTime()
+	machine := &stubProtocolClient{
+		mlStat: func(string) (*protocol.MLEntry, error) {
+			return &protocol.MLEntry{Name: "object", Type: "dir", Size: 7, ModTime: modified}, nil
+		},
+		mlList: func(string) ([]*protocol.MLEntry, error) {
+			return []*protocol.MLEntry{{Name: "object", Type: "file", Size: 7, ModTime: modified}}, nil
+		},
+	}
+	session := &realSession{client: machine, machineListings: true}
+	entry, err := session.Stat("/object")
+	if err != nil || !entry.Directory || entry.Name != "object" || entry.Size != 7 || entry.Modified != modified {
+		t.Fatalf("machine Stat() = %+v, %v", entry, err)
+	}
+	entries, err := session.List("/")
+	if err != nil || len(entries) != 1 || entries[0].Name != "object" || entries[0].Size != 7 {
+		t.Fatalf("machine List() = %+v, %v", entries, err)
+	}
+
+	legacy := &stubProtocolClient{
+		mlStat: func(string) (*protocol.MLEntry, error) { return nil, errInjected },
+		mlList: func(string) ([]*protocol.MLEntry, error) { return nil, errInjected },
+		list: func(string) ([]*protocol.Entry, error) {
+			return []*protocol.Entry{{Name: "object", Type: "link", Size: 9}}, nil
+		},
+		modTime: func(string) (time.Time, error) { return modified, nil },
+	}
+	session = &realSession{client: legacy, machineListings: true}
+	entry, err = session.Stat("/object")
+	if err != nil || !entry.Link || entry.Name != "object" || entry.Size != 9 || entry.Modified != modified {
+		t.Fatalf("legacy Stat() = %+v, %v", entry, err)
+	}
+	entries, err = session.List("/")
+	if err != nil || len(entries) != 1 || !entries[0].Link || entries[0].Modified != (time.Time{}) {
+		t.Fatalf("legacy List() = %+v, %v", entries, err)
+	}
+
+	missing := &stubProtocolClient{list: func(string) ([]*protocol.Entry, error) { return nil, nil }}
+	if _, err := (&realSession{client: missing}).Stat("/missing"); !errors.Is(err, errFileUnavailable) {
+		t.Fatalf("Stat(missing) error = %v", err)
+	}
+	failing := &stubProtocolClient{list: func(string) ([]*protocol.Entry, error) { return nil, errInjected }}
+	if _, err := (&realSession{client: failing}).Stat("/object"); !errors.Is(err, errInjected) {
+		t.Fatalf("Stat(list failure) error = %v", err)
+	}
+	if _, err := (&realSession{client: failing}).List("/"); !errors.Is(err, errInjected) {
+		t.Fatalf("List(failure) error = %v", err)
+	}
+}
+
 func TestConnectCancellationCleansLateAuthenticatedSession(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -468,4 +724,34 @@ type cancelAtEOF struct{ cancel context.CancelFunc }
 func (r cancelAtEOF) Read([]byte) (int, error) {
 	r.cancel()
 	return 0, io.EOF
+}
+
+type stubProtocolClient struct {
+	protocolClient
+	mlStat  func(string) (*protocol.MLEntry, error)
+	mlList  func(string) ([]*protocol.MLEntry, error)
+	list    func(string) ([]*protocol.Entry, error)
+	modTime func(string) (time.Time, error)
+}
+
+func (c *stubProtocolClient) MLStat(name string) (*protocol.MLEntry, error) {
+	if c.mlStat == nil {
+		return nil, errInjected
+	}
+	return c.mlStat(name)
+}
+
+func (c *stubProtocolClient) MLList(name string) ([]*protocol.MLEntry, error) {
+	if c.mlList == nil {
+		return nil, errInjected
+	}
+	return c.mlList(name)
+}
+
+func (c *stubProtocolClient) List(name string) ([]*protocol.Entry, error) {
+	return c.list(name)
+}
+
+func (c *stubProtocolClient) ModTime(name string) (time.Time, error) {
+	return c.modTime(name)
 }

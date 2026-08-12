@@ -67,6 +67,112 @@ func TestPublicConstructorsAndOptions(t *testing.T) {
 	}
 }
 
+func TestConfigurationRangeListAndMetadataBoundaries(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		entries int
+		bytes   int64
+		valid   bool
+	}{
+		{entries: -1, bytes: 1},
+		{entries: 0, bytes: 1},
+		{entries: 1, bytes: -1},
+		{entries: 1, bytes: 0},
+		{entries: 1, bytes: 1, valid: true},
+	} {
+		if err := validateMetadataLimits(test.entries, test.bytes); (err == nil) != test.valid {
+			t.Errorf("validateMetadataLimits(%d, %d) = %v", test.entries, test.bytes, err)
+		}
+	}
+
+	maximum := int64(^uint64(0) >> 1)
+	for _, test := range []struct {
+		byteRange filesystem.ByteRange
+		end       int64
+		valid     bool
+	}{
+		{byteRange: filesystem.ByteRange{Offset: -1, Length: 1}},
+		{byteRange: filesystem.ByteRange{Length: 0}},
+		{byteRange: filesystem.ByteRange{Length: 1}, end: 0, valid: true},
+		{byteRange: filesystem.ByteRange{Offset: 1, Length: 2}, end: 2, valid: true},
+		{byteRange: filesystem.ByteRange{Offset: maximum, Length: 1}, end: maximum, valid: true},
+		{byteRange: filesystem.ByteRange{Offset: maximum, Length: 2}},
+	} {
+		end, valid := inclusiveRangeEnd(test.byteRange)
+		if end != test.end || valid != test.valid {
+			t.Errorf("inclusiveRangeEnd(%+v) = %d, %t; want %d, %t", test.byteRange, end, valid, test.end, test.valid)
+		}
+	}
+
+	for _, test := range []struct {
+		requested int
+		want      int
+	}{
+		{requested: 0, want: 100},
+		{requested: 1, want: 1},
+		{requested: 100, want: 100},
+		{requested: 101, want: 100},
+	} {
+		if got := effectiveListLimit(test.requested, 100); got != test.want {
+			t.Errorf("effectiveListLimit(%d, 100) = %d, want %d", test.requested, got, test.want)
+		}
+	}
+	for _, test := range []struct {
+		metadata map[string]string
+		want     int64
+	}{
+		{metadata: nil},
+		{metadata: map[string]string{"a": "b"}, want: 2},
+		{metadata: map[string]string{"a": "bc", "de": "f"}, want: 6},
+	} {
+		if got := metadataSize(test.metadata); got != test.want {
+			t.Errorf("metadataSize(%v) = %d, want %d", test.metadata, got, test.want)
+		}
+	}
+	for _, test := range []struct {
+		limit int
+		want  bool
+	}{{limit: -1}, {limit: 0}, {limit: 1, want: true}} {
+		if got := positiveListLimit(test.limit); got != test.want {
+			t.Errorf("positiveListLimit(%d) = %t, want %t", test.limit, got, test.want)
+		}
+	}
+	for _, test := range []struct {
+		lifetime time.Duration
+		want     bool
+	}{
+		{lifetime: -1},
+		{lifetime: 0},
+		{lifetime: 1, want: true},
+		{lifetime: maximumTemporaryURLLifetime, want: true},
+		{lifetime: maximumTemporaryURLLifetime + 1},
+	} {
+		if got := validTemporaryURLLifetime(test.lifetime); got != test.want {
+			t.Errorf("validTemporaryURLLifetime(%s) = %t, want %t", test.lifetime, got, test.want)
+		}
+	}
+	if pageSize(100, 0) != 100 || pageSize(1001, 0) != 1000 || pageSize(1001, 1000) != 1 {
+		t.Fatal("pageSize() boundary calculation is wrong")
+	}
+	token := "next"
+	for _, test := range []struct {
+		truncated bool
+		token     *string
+		complete  bool
+	}{
+		{complete: true},
+		{token: &token, complete: true},
+		{truncated: true, complete: true},
+		{truncated: true, token: &token},
+	} {
+		output := &awss3.ListObjectsV2Output{IsTruncated: aws.Bool(test.truncated), NextContinuationToken: test.token}
+		if got := paginationComplete(output); got != test.complete {
+			t.Errorf("paginationComplete(%t, %v) = %t, want %t", test.truncated, test.token, got, test.complete)
+		}
+	}
+}
+
 func TestInternalConstructorRejectsDependenciesAndProfile(t *testing.T) {
 	t.Parallel()
 
@@ -278,6 +384,37 @@ func TestMetadataLimitsBoundRequestsAndResponses(t *testing.T) {
 	backend.objects["object"] = fakeObject{content: []byte("x")}
 	if err := adapter.SetMetadata(context.Background(), path, map[string]string{"key": "value-too-large"}); !errors.Is(err, filesystem.ErrResourceLimit) {
 		t.Fatalf("SetMetadata(oversized metadata) error = %v", err)
+	}
+	exact := map[string]string{"key": "value"}
+	clone, err := adapter.cloneMetadata(exact)
+	if err != nil || clone["key"] != "value" {
+		t.Fatalf("cloneMetadata(exact limits) = %v, %v", clone, err)
+	}
+}
+
+func TestListCommonPrefixLimitAndIteratorCurrentEntry(t *testing.T) {
+	t.Parallel()
+
+	backend := newFakeBackend()
+	backend.listOutputs = []*awss3.ListObjectsV2Output{{
+		CommonPrefixes: []awstypes.CommonPrefix{
+			{Prefix: aws.String("z/")},
+			{Prefix: aws.String("a/")},
+		},
+	}}
+	adapter := mustAdapter(t, backend, config{adapterName: "s3", bucket: "bucket", maxList: 1})
+	iterator, err := adapter.List(context.Background(), filesystem.Root(), filesystem.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !iterator.Next() || iterator.Entry().Path.String() != "z" || iterator.Next() {
+		t.Fatalf("limited common-prefix iterator entry = %+v", iterator.Entry())
+	}
+	if iterator.Entry().Path.String() != "z" {
+		t.Fatal("iterator lost current entry after exhaustion")
+	}
+	if err := iterator.Close(); err != nil || iterator.Next() {
+		t.Fatalf("Close() = %v", err)
 	}
 }
 

@@ -143,7 +143,7 @@ func (f *IOFS) directoryEntries(ctx context.Context, logicalPath Path) ([]fs.Dir
 		return nil, errors.Join(iteratorErr, closeErr)
 	}
 	sort.Slice(entries, func(left, right int) bool {
-		return entries[left].Name() < entries[right].Name()
+		return strings.Compare(entries[left].Name(), entries[right].Name()) == -1
 	})
 	return entries, nil
 }

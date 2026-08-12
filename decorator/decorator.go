@@ -184,7 +184,6 @@ func (a *Adapter) Capabilities() filesystem.CapabilitySet {
 				filesystem.CapabilityMetadata,
 				filesystem.CapabilityVisibility,
 				filesystem.CapabilityMultipart:
-				continue
 			default:
 				filtered = append(filtered, capability)
 			}
@@ -192,13 +191,7 @@ func (a *Adapter) Capabilities() filesystem.CapabilitySet {
 		capabilities = filtered
 	}
 	if a.checksums {
-		found := false
-		for _, capability := range capabilities {
-			found = found || capability == filesystem.CapabilityChecksum
-		}
-		if !found {
-			capabilities = append(capabilities, filesystem.CapabilityChecksum)
-		}
+		capabilities = append(capabilities, filesystem.CapabilityChecksum)
 	}
 	return filesystem.NewCapabilitySet(capabilities...)
 }
@@ -472,14 +465,10 @@ func retryCall[T any](ctx context.Context, policy *RetryPolicy, call func() (T, 
 			!policy.Retryable(err) {
 			return result, err
 		}
-		var delay time.Duration
-		if policy.Backoff != nil {
-			delay = policy.Backoff(attempt)
-		}
-		if delay <= 0 {
+		if policy.Backoff == nil {
 			continue
 		}
-		timer := time.NewTimer(delay)
+		timer := time.NewTimer(policy.Backoff(attempt))
 		select {
 		case <-ctx.Done():
 			_ = timer.Stop()

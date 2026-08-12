@@ -53,12 +53,30 @@ func (i *edgeIterator) Close() error            { return i.closeErr }
 func TestIOFSRequiresEveryCapability(t *testing.T) {
 	t.Parallel()
 
-	defer func() {
-		if recover() == nil {
-			t.Fatal("NewIOFS() did not panic for missing capabilities")
-		}
-	}()
-	filesystem.NewIOFS(nil, nil, nil)
+	reader := readerFunc(func(context.Context, filesystem.Path) (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader("")), nil
+	})
+	statter := statterFunc(func(context.Context, filesystem.Path) (filesystem.Metadata, error) {
+		return filesystem.Metadata{}, nil
+	})
+	lister := listerFunc(func(context.Context, filesystem.Path, filesystem.ListOptions) (filesystem.EntryIterator, error) {
+		return &edgeIterator{}, nil
+	})
+
+	for name, construct := range map[string]func(){
+		"reader":  func() { filesystem.NewIOFS(nil, statter, lister) },
+		"statter": func() { filesystem.NewIOFS(reader, nil, lister) },
+		"lister":  func() { filesystem.NewIOFS(reader, statter, nil) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("NewIOFS() did not panic for a missing capability")
+				}
+			}()
+			construct()
+		})
+	}
 }
 
 func TestIOFSMapsCapabilityAndPathFailures(t *testing.T) {

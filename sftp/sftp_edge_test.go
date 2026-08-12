@@ -19,8 +19,6 @@ import (
 var errInjected = errors.New("injected SFTP failure")
 
 func TestConfigurationAndInternalConstructorValidation(t *testing.T) {
-	t.Parallel()
-
 	base := Config{
 		Address:         "127.0.0.1:1",
 		User:            "user",
@@ -44,21 +42,63 @@ func TestConfigurationAndInternalConstructorValidation(t *testing.T) {
 	if _, err := newAdapter(context.Background(), nil, "/", 1); err == nil {
 		t.Fatal("newAdapter(nil connector) error = nil")
 	}
-	connector := func(context.Context) (remoteSession, error) { return nil, errInjected }
+	connectorCalls := 0
+	connector := func(context.Context) (remoteSession, error) {
+		connectorCalls++
+		return nil, errInjected
+	}
 	if _, err := newAdapter(context.Background(), connector, "relative", 1); err == nil {
 		t.Fatal("newAdapter(relative root) error = nil")
 	}
-	if _, err := newAdapter(context.Background(), connector, "/", 0); err == nil {
-		t.Fatal("newAdapter(invalid maximum) error = nil")
+	if _, err := newAdapter(context.Background(), connector, "/", 0); err == nil || !strings.Contains(err.Error(), "maximum list entries") {
+		t.Fatalf("newAdapter(invalid maximum) error = %v", err)
+	}
+	if connectorCalls != 0 {
+		t.Fatalf("newAdapter(invalid maximum) connector calls = %d, want 0", connectorCalls)
 	}
 	if _, err := newAdapter(context.Background(), connector, "/", 1); !errors.Is(err, errInjected) {
 		t.Fatalf("newAdapter(connect) error = %v", err)
 	}
+	if connectorCalls != 1 {
+		t.Fatalf("newAdapter(valid maximum) connector calls = %d, want 1", connectorCalls)
+	}
+}
+
+func TestConfigurationRangeAndListBoundaries(t *testing.T) {
+	t.Parallel()
+
+	if defaultTimeout(0) != 30*time.Second || defaultTimeout(time.Nanosecond) != time.Nanosecond {
+		t.Fatal("defaultTimeout() boundary behavior is wrong")
+	}
+	if defaultMaxList(0) != 10_000 || defaultMaxList(1) != 1 {
+		t.Fatal("defaultMaxList() boundary behavior is wrong")
+	}
+	for _, test := range []struct {
+		requested int
+		want      int
+	}{{0, 100}, {1, 1}, {100, 100}, {101, 100}} {
+		if got := effectiveListLimit(test.requested, 100); got != test.want {
+			t.Errorf("effectiveListLimit(%d, 100) = %d, want %d", test.requested, got, test.want)
+		}
+	}
+	maximum := int64(^uint64(0) >> 1)
+	for _, test := range []struct {
+		byteRange filesystem.ByteRange
+		valid     bool
+	}{
+		{byteRange: filesystem.ByteRange{Offset: -1, Length: 1}},
+		{byteRange: filesystem.ByteRange{Length: 0}},
+		{byteRange: filesystem.ByteRange{Length: 1}, valid: true},
+		{byteRange: filesystem.ByteRange{Offset: maximum, Length: 1}, valid: true},
+		{byteRange: filesystem.ByteRange{Offset: maximum, Length: 2}},
+	} {
+		if got := validByteRange(test.byteRange); got != test.valid {
+			t.Errorf("validByteRange(%+v) = %t, want %t", test.byteRange, got, test.valid)
+		}
+	}
 }
 
 func TestCloseIsIdempotentAndPropagatesSessionFailure(t *testing.T) {
-	t.Parallel()
-
 	session := &fakeSession{state: newFakeState(), closeError: errInjected}
 	adapter := testAdapter(t, session)
 	if err := adapter.Close(); !errors.Is(err, errInjected) {
@@ -251,6 +291,9 @@ func TestListHostileEntriesRecursionAndIteratorEdges(t *testing.T) {
 	}
 	for iterator.Next() {
 	}
+	if iterator.Entry().Path.String() != "directory/nested/file" {
+		t.Fatalf("Entry(after exhaustion) = %+v", iterator.Entry())
+	}
 	if err := iterator.Close(); err != nil || iterator.Next() {
 		t.Fatalf("Close() = %v", err)
 	}
@@ -320,7 +363,7 @@ func TestChecksumsUnsupportedOperationsAndHelpers(t *testing.T) {
 			t.Fatalf("unsupported operation = %v", err)
 		}
 	}
-	for _, root := range []string{"", "/", "/storage/../escape", `C:\\storage`, "/bad\nroot"} {
+	for _, root := range []string{"", "/", "/storage/../escape", `C:\\storage`, `/storage\escape`, "/bad\nroot"} {
 		validated, err := validateRoot(root)
 		if (root == "" || root == "/") != (err == nil) {
 			t.Fatalf("validateRoot(%q) = %q, %v", root, validated, err)
@@ -338,8 +381,6 @@ func TestChecksumsUnsupportedOperationsAndHelpers(t *testing.T) {
 }
 
 func TestSessionStateAndReconnectFailures(t *testing.T) {
-	t.Parallel()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	adapter := &Adapter{}

@@ -40,10 +40,14 @@ type fakeRoot struct {
 	renameErr error
 	fsys      fs.FS
 	closeErr  error
+	openFlags int
+	openMode  fs.FileMode
 }
 
 func (r *fakeRoot) Open(string) (localFile, error) { return r.openFile, r.openErr }
-func (r *fakeRoot) OpenFile(string, int, fs.FileMode) (localFile, error) {
+func (r *fakeRoot) OpenFile(_ string, flags int, mode fs.FileMode) (localFile, error) {
+	r.openFlags = flags
+	r.openMode = mode
 	return r.create, r.createErr
 }
 func (r *fakeRoot) Stat(string) (fs.FileInfo, error)   { return r.statInfo, r.statErr }
@@ -258,6 +262,34 @@ func TestContextReaderStopsBeforeSourceAfterCancellation(t *testing.T) {
 	reader := contextReader{ctx: ctx, reader: strings.NewReader("content")}
 	if _, err := reader.Read(make([]byte, 1)); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Read() error = %v", err)
+	}
+}
+
+func TestTemporaryNameAndIteratorBoundaries(t *testing.T) {
+	t.Parallel()
+
+	adapter := fakeAdapter(&fakeRoot{})
+	if got, err := adapter.temporaryName("."); err != nil || !strings.HasPrefix(got, ".filesystem-") || strings.Contains(got, "/") {
+		t.Fatalf("temporaryName(.) = %q, %v", got, err)
+	}
+	adapter.random = bytes.NewReader(make([]byte, 16))
+	if got, err := adapter.temporaryName("directory"); err != nil || !strings.HasPrefix(got, "directory/.filesystem-") {
+		t.Fatalf("temporaryName(directory) = %q, %v", got, err)
+	}
+
+	entry := filesystem.Entry{Path: filesystem.MustParsePath("object")}
+	iterator := &iterator{entries: []filesystem.Entry{entry}}
+	if got := iterator.Entry(); !got.Path.IsRoot() {
+		t.Fatalf("Entry(before Next) = %+v", got)
+	}
+	if !iterator.Next() || iterator.Entry().Path != entry.Path || iterator.Next() {
+		t.Fatal("iterator did not expose exactly one entry")
+	}
+	if iterator.Entry().Path != entry.Path {
+		t.Fatal("iterator lost the current entry after exhaustion")
+	}
+	if err := iterator.Close(); err != nil || iterator.Next() {
+		t.Fatalf("Close() = %v", err)
 	}
 }
 

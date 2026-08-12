@@ -15,7 +15,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 
 	filesystem "github.com/faustbrian/golib/pkg/filesystem"
@@ -34,6 +34,8 @@ var capabilities = filesystem.NewCapabilitySet(
 	filesystem.CapabilityRangeRead,
 	filesystem.CapabilityChecksum,
 )
+
+const temporaryOpenFlags = os.O_WRONLY | os.O_CREATE | os.O_EXCL
 
 // SymlinkPolicy controls whether logical paths may traverse symbolic links.
 type SymlinkPolicy uint8
@@ -235,7 +237,7 @@ func (a *Adapter) Write(ctx context.Context, logicalPath filesystem.Path, source
 	if err != nil {
 		return filesystem.Metadata{}, err
 	}
-	file, err := a.root.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_EXCL, a.fileMode)
+	file, err := a.root.OpenFile(temporary, temporaryOpenFlags, a.fileMode)
 	if err != nil {
 		return filesystem.Metadata{}, fmt.Errorf("local: create temporary file: %w", err)
 	}
@@ -397,10 +399,10 @@ func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options f
 	if err != nil && !errors.Is(err, stop) {
 		return nil, mapError(directory, err)
 	}
-	sort.Slice(entries, func(left, right int) bool {
-		return entries[left].Path.String() < entries[right].Path.String()
+	slices.SortFunc(entries, func(left, right filesystem.Entry) int {
+		return strings.Compare(left.Path.String(), right.Path.String())
 	})
-	return &iterator{entries: entries, index: -1}, nil
+	return &iterator{entries: entries}, nil
 }
 
 // Copy streams a source into an atomically published destination.
@@ -504,10 +506,11 @@ func (a *Adapter) checkSymlinks(logicalPath filesystem.Path, includeFinal bool) 
 		return nil
 	}
 	segments := strings.Split(logicalPath.String(), "/")
-	if !includeFinal && len(segments) > 0 {
-		segments = segments[:len(segments)-1]
+	segmentCount := len(segments)
+	if !includeFinal {
+		segmentCount--
 	}
-	for index := range segments {
+	for index := range segments[:segmentCount] {
 		name := strings.Join(segments[:index+1], "/")
 		info, err := a.root.Lstat(name)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -516,7 +519,8 @@ func (a *Adapter) checkSymlinks(logicalPath filesystem.Path, includeFinal bool) 
 		if err != nil {
 			return mapError(logicalPath, err)
 		}
-		if info.Mode()&fs.ModeSymlink != 0 {
+		switch info.Mode().Type() {
+		case fs.ModeSymlink:
 			return fmt.Errorf("local: symbolic link %q is denied", name)
 		}
 	}
@@ -529,10 +533,12 @@ func (a *Adapter) temporaryName(directory string) (string, error) {
 		return "", fmt.Errorf("local: generate temporary name: %w", err)
 	}
 	name := ".filesystem-" + hex.EncodeToString(random[:]) + ".tmp"
-	if directory == "." {
+	switch directory {
+	case ".":
 		return name, nil
+	default:
+		return directory + "/" + name, nil
 	}
-	return directory + "/" + name, nil
 }
 
 type contextReader struct {
@@ -541,10 +547,12 @@ type contextReader struct {
 }
 
 func (r contextReader) Read(buffer []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
+	select {
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	default:
+		return r.reader.Read(buffer)
 	}
-	return r.reader.Read(buffer)
 }
 
 type contextReadCloser struct {
@@ -553,10 +561,12 @@ type contextReadCloser struct {
 }
 
 func (r *contextReadCloser) Read(buffer []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
+	select {
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	default:
+		return r.file.Read(buffer)
 	}
-	return r.file.Read(buffer)
 }
 
 func (r *contextReadCloser) Close() error { return r.file.Close() }
@@ -569,24 +579,27 @@ type limitedReadCloser struct {
 func (r *limitedReadCloser) Close() error { return r.closer.Close() }
 
 type iterator struct {
-	entries []filesystem.Entry
-	index   int
-	closed  bool
+	entries    []filesystem.Entry
+	current    filesystem.Entry
+	hasCurrent bool
+	closed     bool
 }
 
 func (i *iterator) Next() bool {
-	if i.closed || i.index+1 >= len(i.entries) {
+	if i.closed || len(i.entries) == 0 {
 		return false
 	}
-	i.index++
+	i.current = i.entries[0]
+	i.entries = i.entries[1:]
+	i.hasCurrent = true
 	return true
 }
 
 func (i *iterator) Entry() filesystem.Entry {
-	if i.index < 0 || i.index >= len(i.entries) {
+	if !i.hasCurrent {
 		return filesystem.Entry{}
 	}
-	return i.entries[i.index]
+	return i.current
 }
 
 func (i *iterator) Err() error { return nil }

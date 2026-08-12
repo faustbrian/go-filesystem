@@ -46,12 +46,10 @@ func ParsePath(value string) (Path, error) {
 	segments := strings.Split(value, "/")
 	normalized := make([]string, 0, len(segments))
 	for _, segment := range segments {
-		switch segment {
-		case "", ".":
-			continue
-		case "..":
+		if segment == ".." {
 			return Path{}, invalidPath(value, "parent segment")
-		default:
+		}
+		if segment != "" && segment != "." {
 			normalized = append(normalized, segment)
 		}
 	}

@@ -8,7 +8,7 @@ import (
 	"io"
 	"mime"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -63,8 +63,8 @@ type config struct {
 // by the service. Defaults are 128 entries and 64 KiB of keys plus values.
 func WithMetadataLimits(maxEntries int, maxBytes int64) Option {
 	return func(configuration *config) error {
-		if maxEntries <= 0 || maxBytes <= 0 {
-			return errors.New("s3: metadata limits must be positive")
+		if err := validateMetadataLimits(maxEntries, maxBytes); err != nil {
+			return err
 		}
 		configuration.maxMetadataEntries = maxEntries
 		configuration.maxMetadataBytes = maxBytes
@@ -83,7 +83,7 @@ func WithPrefix(prefix string) Option {
 // WithMaxListEntries bounds one List call. The default is 10,000 entries.
 func WithMaxListEntries(limit int) Option {
 	return func(configuration *config) error {
-		if limit <= 0 {
+		if !positiveListLimit(limit) {
 			return errors.New("s3: maximum list entries must be positive")
 		}
 		configuration.maxList = limit
@@ -172,10 +172,12 @@ func newAdapter(client objectClient, uploader uploadClient, presigner presignCli
 		configuration.maxMetadataEntries = defaultMaxMetadataEntries
 		configuration.maxMetadataBytes = defaultMaxMetadataBytes
 	}
-	if configuration.maxMetadataEntries <= 0 || configuration.maxMetadataBytes <= 0 {
-		return nil, errors.New("s3: metadata limits must be positive")
+	if err := validateMetadataLimits(configuration.maxMetadataEntries, configuration.maxMetadataBytes); err != nil {
+		return nil, err
 	}
-	if configuration.adapterName != "s3" && configuration.adapterName != "r2" {
+	switch configuration.adapterName {
+	case "s3", "r2":
+	default:
 		return nil, fmt.Errorf("s3: invalid adapter profile %q", configuration.adapterName)
 	}
 	if configuration.prefix != "" {
@@ -233,10 +235,10 @@ func (a *Adapter) Open(ctx context.Context, logicalPath filesystem.Path) (io.Rea
 
 // OpenRange returns an inclusive HTTP byte range as a stream.
 func (a *Adapter) OpenRange(ctx context.Context, logicalPath filesystem.Path, byteRange filesystem.ByteRange) (io.ReadCloser, error) {
-	if byteRange.Offset < 0 || byteRange.Length <= 0 || byteRange.Offset > byteRange.Offset+byteRange.Length-1 {
+	end, valid := inclusiveRangeEnd(byteRange)
+	if !valid {
 		return nil, fmt.Errorf("%w: offset=%d length=%d", filesystem.ErrInvalidRange, byteRange.Offset, byteRange.Length)
 	}
-	end := byteRange.Offset + byteRange.Length - 1
 	output, err := a.client.GetObject(ctx, &awss3.GetObjectInput{
 		Bucket: aws.String(a.bucket),
 		Key:    aws.String(a.key(logicalPath)),
@@ -330,15 +332,14 @@ func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options f
 	if options.Limit < 0 {
 		return nil, errors.New("s3: list limit must not be negative")
 	}
-	limit := options.Limit
-	if limit == 0 || limit > a.maxList {
-		limit = a.maxList
-	}
+	limit := effectiveListLimit(options.Limit, a.maxList)
 	prefix := a.prefix
 	if !directory.IsRoot() {
 		prefix = a.key(directory)
 	}
-	if prefix != "" {
+	switch prefix {
+	case "":
+	default:
 		prefix += "/"
 	}
 	input := &awss3.ListObjectsV2Input{
@@ -351,7 +352,7 @@ func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options f
 	}
 
 	entries := make([]filesystem.Entry, 0, limit)
-	for len(entries) < limit {
+	for {
 		output, err := a.client.ListObjectsV2(ctx, input)
 		if err != nil {
 			return nil, mapError(directory, err)
@@ -367,29 +368,32 @@ func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options f
 				Size:     aws.ToInt64(object.Size),
 				Modified: aws.ToTime(object.LastModified),
 			})
-			if len(entries) == limit {
-				break
+			if len(entries) >= limit {
+				return newIterator(entries), nil
 			}
 		}
 		for _, commonPrefix := range output.CommonPrefixes {
-			if len(entries) == limit {
-				break
-			}
 			logicalPath, ok := a.logicalPath(aws.ToString(commonPrefix.Prefix), true)
 			if ok {
 				entries = append(entries, filesystem.Entry{Path: logicalPath, Kind: filesystem.EntryKindDirectory})
+				if len(entries) >= limit {
+					return newIterator(entries), nil
+				}
 			}
 		}
-		if !aws.ToBool(output.IsTruncated) || output.NextContinuationToken == nil {
-			break
+		if paginationComplete(output) {
+			return newIterator(entries), nil
 		}
 		input.ContinuationToken = output.NextContinuationToken
-		input.MaxKeys = aws.Int32(int32(min(limit-len(entries), 1000)))
+		input.MaxKeys = aws.Int32(pageSize(limit, len(entries)))
 	}
-	sort.Slice(entries, func(left, right int) bool {
-		return entries[left].Path.String() < entries[right].Path.String()
+}
+
+func newIterator(entries []filesystem.Entry) filesystem.EntryIterator {
+	slices.SortFunc(entries, func(left, right filesystem.Entry) int {
+		return strings.Compare(left.Path.String(), right.Path.String())
 	})
-	return &iterator{entries: entries, index: -1}, nil
+	return &iterator{entries: entries}
 }
 
 // Copy performs a server-side copy. No-clobber copy is rejected because S3
@@ -442,7 +446,7 @@ func (a *Adapter) Checksum(context.Context, filesystem.Path, filesystem.Checksum
 
 // TemporaryURL creates a presigned GetObject URL valid for at most seven days.
 func (a *Adapter) TemporaryURL(ctx context.Context, logicalPath filesystem.Path, lifetime time.Duration, options filesystem.TemporaryURLOptions) (string, error) {
-	if lifetime <= 0 || lifetime > maximumTemporaryURLLifetime {
+	if !validTemporaryURLLifetime(lifetime) {
 		return "", fmt.Errorf("s3: temporary URL lifetime must be between 1ns and %s", maximumTemporaryURLLifetime)
 	}
 	input := &awss3.GetObjectInput{
@@ -499,24 +503,27 @@ func (a *Adapter) logicalPath(key string, directory bool) (filesystem.Path, bool
 }
 
 type iterator struct {
-	entries []filesystem.Entry
-	index   int
-	closed  bool
+	entries    []filesystem.Entry
+	current    filesystem.Entry
+	hasCurrent bool
+	closed     bool
 }
 
 func (i *iterator) Next() bool {
-	if i.closed || i.index+1 >= len(i.entries) {
+	if i.closed || len(i.entries) == 0 {
 		return false
 	}
-	i.index++
+	i.current = i.entries[0]
+	i.entries = i.entries[1:]
+	i.hasCurrent = true
 	return true
 }
 
 func (i *iterator) Entry() filesystem.Entry {
-	if i.index < 0 || i.index >= len(i.entries) {
+	if !i.hasCurrent {
 		return filesystem.Entry{}
 	}
-	return i.entries[i.index]
+	return i.current
 }
 
 func (i *iterator) Err() error { return nil }
@@ -530,7 +537,10 @@ func mapError(logicalPath filesystem.Path, err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	if errors.Is(err, context.Canceled) {
+		return err
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
 		return err
 	}
 	var apiError smithy.APIError
@@ -567,19 +577,13 @@ func (a *Adapter) cloneMetadata(source map[string]string) (map[string]string, er
 			a.maxMetadataEntries,
 		)
 	}
-	var size int64
-	for key, value := range source {
-		remaining := a.maxMetadataBytes - size
-		entrySize := int64(len(key)) + int64(len(value))
-		if entrySize > remaining {
-			return nil, fmt.Errorf(
-				"%w: %s metadata exceeds %d bytes",
-				filesystem.ErrResourceLimit,
-				a.adapterName,
-				a.maxMetadataBytes,
-			)
-		}
-		size += entrySize
+	if metadataSize(source) > a.maxMetadataBytes {
+		return nil, fmt.Errorf(
+			"%w: %s metadata exceeds %d bytes",
+			filesystem.ErrResourceLimit,
+			a.adapterName,
+			a.maxMetadataBytes,
+		)
 	}
 	clone := make(map[string]string, len(source))
 	for key, value := range source {
@@ -595,4 +599,59 @@ func containsControl(value string) bool {
 		}
 	}
 	return false
+}
+
+func validateMetadataLimits(maxEntries int, maxBytes int64) error {
+	if maxEntries <= 0 {
+		return errors.New("s3: maximum metadata entries must be positive")
+	}
+	if maxBytes <= 0 {
+		return errors.New("s3: maximum metadata bytes must be positive")
+	}
+	return nil
+}
+
+func inclusiveRangeEnd(byteRange filesystem.ByteRange) (int64, bool) {
+	if byteRange.Offset < 0 || byteRange.Length <= 0 {
+		return 0, false
+	}
+	maximum := int64(^uint64(0) >> 1)
+	if byteRange.Length-1 > maximum-byteRange.Offset {
+		return 0, false
+	}
+	return byteRange.Offset + byteRange.Length - 1, true
+}
+
+func effectiveListLimit(requested, maximum int) int {
+	if requested == 0 {
+		return maximum
+	}
+	return min(requested, maximum)
+}
+
+func metadataSize(metadata map[string]string) int64 {
+	var size int64
+	for key, value := range metadata {
+		size += int64(len(key)) + int64(len(value))
+	}
+	return size
+}
+
+func paginationComplete(output *awss3.ListObjectsV2Output) bool {
+	if !aws.ToBool(output.IsTruncated) {
+		return true
+	}
+	return output.NextContinuationToken == nil
+}
+
+func pageSize(limit, collected int) int32 {
+	return int32(min(limit-collected, 1000))
+}
+
+func validTemporaryURLLifetime(lifetime time.Duration) bool {
+	return lifetime > 0 && lifetime <= maximumTemporaryURLLifetime
+}
+
+func positiveListLimit(limit int) bool {
+	return limit > 0
 }

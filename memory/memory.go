@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -113,10 +113,8 @@ func (a *Adapter) OpenRange(ctx context.Context, path filesystem.Path, byteRange
 	if byteRange.Offset >= int64(len(content)) {
 		return nil, fmt.Errorf("%w: offset=%d size=%d", filesystem.ErrInvalidRange, byteRange.Offset, len(content))
 	}
-	end := byteRange.Offset + byteRange.Length
-	if end < byteRange.Offset || end > int64(len(content)) {
-		end = int64(len(content))
-	}
+	available := int64(len(content)) - byteRange.Offset
+	end := byteRange.Offset + min(byteRange.Length, available)
 
 	return io.NopCloser(bytes.NewReader(content[byteRange.Offset:end])), nil
 }
@@ -147,7 +145,8 @@ func (a *Adapter) Write(ctx context.Context, path filesystem.Path, source io.Rea
 		modified:    now,
 	}
 	a.mu.Lock()
-	if _, exists := a.objects[path.String()]; exists && options.IfNoneMatch {
+	_, exists := a.objects[path.String()]
+	if options.IfNoneMatch && exists {
 		a.mu.Unlock()
 		return filesystem.Metadata{}, fmt.Errorf("%w: %s", filesystem.ErrPreconditionFailed, path)
 	}
@@ -221,8 +220,8 @@ func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options f
 		}
 		remainder := strings.TrimPrefix(name, prefix)
 		if !options.Recursive {
-			if separator := strings.IndexByte(remainder, '/'); separator >= 0 {
-				name = prefix + remainder[:separator]
+			if child, _, found := strings.Cut(remainder, "/"); found {
+				name = prefix + child
 				entriesByPath[name] = filesystem.Entry{Path: filesystem.MustParsePath(name), Kind: filesystem.EntryKindDirectory}
 				continue
 			}
@@ -240,13 +239,13 @@ func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options f
 	for _, entry := range entriesByPath {
 		entries = append(entries, entry)
 	}
-	sort.Slice(entries, func(left, right int) bool {
-		return entries[left].Path.String() < entries[right].Path.String()
+	slices.SortFunc(entries, func(left, right filesystem.Entry) int {
+		return strings.Compare(left.Path.String(), right.Path.String())
 	})
-	if options.Limit > 0 && len(entries) > options.Limit {
-		entries = entries[:options.Limit]
+	if limit := effectiveListLimit(options.Limit, len(entries)); limit != len(entries) {
+		entries = entries[:limit]
 	}
-	return &iterator{entries: entries, index: -1}, nil
+	return &iterator{entries: entries}, nil
 }
 
 // Copy duplicates an object and its properties.
@@ -260,7 +259,8 @@ func (a *Adapter) Copy(ctx context.Context, source, destination filesystem.Path,
 	if !found {
 		return notFound(source)
 	}
-	if _, exists := a.objects[destination.String()]; exists && !options.Overwrite {
+	_, exists := a.objects[destination.String()]
+	if !options.Overwrite && exists {
 		return fmt.Errorf("%w: %s", filesystem.ErrAlreadyExists, destination)
 	}
 	stored.content = append([]byte(nil), stored.content...)
@@ -281,7 +281,8 @@ func (a *Adapter) Move(ctx context.Context, source, destination filesystem.Path,
 	if !found {
 		return notFound(source)
 	}
-	if _, exists := a.objects[destination.String()]; exists && !options.Overwrite {
+	_, exists := a.objects[destination.String()]
+	if !options.Overwrite && exists {
 		return fmt.Errorf("%w: %s", filesystem.ErrAlreadyExists, destination)
 	}
 	stored.modified = a.clock()
@@ -368,31 +369,43 @@ type contextReader struct {
 }
 
 func (r contextReader) Read(buffer []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
+	select {
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	default:
+		return r.reader.Read(buffer)
 	}
-	return r.reader.Read(buffer)
 }
 
 type iterator struct {
-	entries []filesystem.Entry
-	index   int
-	closed  bool
+	entries    []filesystem.Entry
+	current    filesystem.Entry
+	hasCurrent bool
+	closed     bool
 }
 
 func (i *iterator) Next() bool {
-	if i.closed || i.index+1 >= len(i.entries) {
+	if i.closed || len(i.entries) == 0 {
 		return false
 	}
-	i.index++
+	i.current = i.entries[0]
+	i.entries = i.entries[1:]
+	i.hasCurrent = true
 	return true
 }
 
 func (i *iterator) Entry() filesystem.Entry {
-	if i.index < 0 || i.index >= len(i.entries) {
+	if !i.hasCurrent {
 		return filesystem.Entry{}
 	}
-	return i.entries[i.index]
+	return i.current
+}
+
+func effectiveListLimit(requested, available int) int {
+	if requested == 0 {
+		return available
+	}
+	return min(requested, available)
 }
 
 func (i *iterator) Err() error { return nil }

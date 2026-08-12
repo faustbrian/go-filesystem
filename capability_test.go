@@ -57,9 +57,13 @@ func TestCapabilitySetDropsDuplicates(t *testing.T) {
 	set := filesystem.NewCapabilitySet(
 		filesystem.CapabilityRead,
 		filesystem.CapabilityRead,
+		filesystem.CapabilityWrite,
 	)
-	if listed := set.List(); len(listed) != 1 || listed[0] != filesystem.CapabilityRead {
-		t.Fatalf("List() = %v, want one read capability", listed)
+	listed := set.List()
+	if len(listed) != 2 ||
+		listed[0] != filesystem.CapabilityRead ||
+		listed[1] != filesystem.CapabilityWrite {
+		t.Fatalf("List() = %v, want read and write capabilities", listed)
 	}
 }
 

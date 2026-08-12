@@ -267,6 +267,9 @@ func TestListingRejectsEscapedEntriesAndReportsInnerFaults(t *testing.T) {
 func TestRetryPolicyTerminationAndBackoff(t *testing.T) {
 	injected := errors.New("retryable")
 	policy := &RetryPolicy{Attempts: 3, Retryable: func(error) bool { return true }}
+	boundedContext := func() (context.Context, context.CancelFunc) {
+		return context.WithTimeout(context.Background(), 100*time.Millisecond)
+	}
 
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -278,7 +281,9 @@ func TestRetryPolicyTerminationAndBackoff(t *testing.T) {
 	}
 
 	calls := 0
-	if result, err := retryCall(context.Background(), policy, func() (string, error) {
+	deadlineContext, cancelDeadline := boundedContext()
+	defer cancelDeadline()
+	if result, err := retryCall(deadlineContext, policy, func() (string, error) {
 		calls++
 		return "partial", context.DeadlineExceeded
 	}); result != "partial" || !errors.Is(err, context.DeadlineExceeded) || calls != 1 {
@@ -287,7 +292,9 @@ func TestRetryPolicyTerminationAndBackoff(t *testing.T) {
 
 	calls = 0
 	nonRetryable := &RetryPolicy{Attempts: 3, Retryable: func(error) bool { return false }}
-	if _, err := retryCall(context.Background(), nonRetryable, func() (string, error) {
+	nonRetryableContext, cancelNonRetryable := boundedContext()
+	defer cancelNonRetryable()
+	if _, err := retryCall(nonRetryableContext, nonRetryable, func() (string, error) {
 		calls++
 		return "", injected
 	}); !errors.Is(err, injected) || calls != 1 {
@@ -295,7 +302,9 @@ func TestRetryPolicyTerminationAndBackoff(t *testing.T) {
 	}
 
 	calls = 0
-	if _, err := retryCall(context.Background(), policy, func() (string, error) {
+	exhaustedContext, cancelExhausted := boundedContext()
+	defer cancelExhausted()
+	if _, err := retryCall(exhaustedContext, policy, func() (string, error) {
 		calls++
 		return "", injected
 	}); !errors.Is(err, injected) || calls != 3 {
@@ -308,7 +317,9 @@ func TestRetryPolicyTerminationAndBackoff(t *testing.T) {
 		Retryable: func(error) bool { return true },
 		Backoff:   func(int) time.Duration { return time.Millisecond },
 	}
-	if result, err := retryCall(context.Background(), withDelay, func() (string, error) {
+	delayContext, cancelDelay := boundedContext()
+	defer cancelDelay()
+	if result, err := retryCall(delayContext, withDelay, func() (string, error) {
 		calls++
 		if calls == 1 {
 			return "", injected

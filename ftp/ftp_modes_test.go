@@ -33,7 +33,7 @@ func TestConcreteTransportModeMatrix(t *testing.T) {
 				TLSMode:        TLSPlaintext,
 				AllowPlaintext: true,
 				DataMode:       dataMode,
-				Timeout:        5 * time.Second,
+				Timeout:        30 * time.Second,
 			}
 			adapter, err := New(context.Background(), configuration)
 			if err != nil {

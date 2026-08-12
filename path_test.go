@@ -75,6 +75,30 @@ func TestParsePathRejectsAmbiguousOrEscapingPaths(t *testing.T) {
 	}
 }
 
+func TestParsePathRecognizesOnlyASCIIWindowsDriveLetters(t *testing.T) {
+	t.Parallel()
+
+	for _, input := range []string{"A:", "A:/file", "Z:/file", "a:/file", "z:/file"} {
+		input := input
+		t.Run("reject "+input, func(t *testing.T) {
+			t.Parallel()
+			if _, err := filesystem.ParsePath(input); !errors.Is(err, filesystem.ErrInvalidPath) {
+				t.Fatalf("ParsePath(%q) error = %v, want ErrInvalidPath", input, err)
+			}
+		})
+	}
+
+	for _, input := range []string{"A", "@:/file", "[:/file", "`:/file", "{:/file", "1:/file"} {
+		input := input
+		t.Run("accept "+input, func(t *testing.T) {
+			t.Parallel()
+			if _, err := filesystem.ParsePath(input); err != nil {
+				t.Fatalf("ParsePath(%q) error = %v", input, err)
+			}
+		})
+	}
+}
+
 func TestPathRelationshipOperations(t *testing.T) {
 	t.Parallel()
 

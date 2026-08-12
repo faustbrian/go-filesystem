@@ -4,9 +4,12 @@ package redact
 
 import (
 	"net/url"
+	"regexp"
 	"strings"
 	"unicode"
 )
+
+var urlSchemePattern = regexp.MustCompile(`(?i)https?://`)
 
 // Error sanitizes URLs, authentication headers, and explicitly supplied
 // secrets while preserving err as the unwrap target.
@@ -43,14 +46,11 @@ func (e sanitizedError) Unwrap() error { return e.cause }
 
 func redactURLs(message string) string {
 	var sanitized strings.Builder
-	for len(message) > 0 {
-		index := indexFold(message, "https://")
-		if httpIndex := indexFold(message, "http://"); httpIndex >= 0 && (index < 0 || httpIndex < index) {
-			index = httpIndex
-		}
-		if index < 0 {
+	for message != "" {
+		index, found := firstURLIndex(message)
+		if !found {
 			sanitized.WriteString(message)
-			break
+			return sanitized.String()
 		}
 		sanitized.WriteString(message[:index])
 		message = message[index:]
@@ -79,25 +79,32 @@ func redactURLs(message string) string {
 
 func redactHeaders(message, header string) string {
 	for {
-		index := indexFold(message, header)
-		if index < 0 {
+		index, found := indexFold(message, header)
+		if !found {
 			return message
 		}
-		end := strings.IndexByte(message[index:], '\n')
-		if end < 0 {
-			end = len(message)
-		} else {
-			end += index
+		prefix := message[:index]
+		remainder := message[index:]
+		_, suffix, found := strings.Cut(remainder, "\n")
+		if found {
+			suffix = "\n" + suffix
 		}
-		message = message[:index] + "[REDACTED HEADER]" + message[end:]
+		message = prefix + "[REDACTED HEADER]" + suffix
 	}
 }
 
-func indexFold(value, substring string) int {
-	for index := 0; index+len(substring) <= len(value); index++ {
-		if strings.EqualFold(value[index:index+len(substring)], substring) {
-			return index
-		}
+func indexFold(value, substring string) (int, bool) {
+	location := regexp.MustCompile(`(?i)` + regexp.QuoteMeta(substring)).FindStringIndex(value)
+	if location == nil {
+		return 0, false
 	}
-	return -1
+	return location[0], true
+}
+
+func firstURLIndex(message string) (int, bool) {
+	location := urlSchemePattern.FindStringIndex(message)
+	if location == nil {
+		return 0, false
+	}
+	return location[0], true
 }

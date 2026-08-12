@@ -16,7 +16,7 @@ import (
 	"net"
 	"os"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -105,20 +105,14 @@ func New(ctx context.Context, configuration Config) (*Adapter, error) {
 	if err != nil {
 		return nil, err
 	}
-	timeout := configuration.Timeout
-	if timeout == 0 {
-		timeout = 30 * time.Second
-	}
-	if timeout < 0 {
+	if configuration.Timeout < 0 {
 		return nil, errors.New("sftp: timeout must not be negative")
 	}
-	maxList := configuration.MaxListEntries
-	if maxList == 0 {
-		maxList = 10_000
-	}
-	if maxList < 0 {
+	if configuration.MaxListEntries < 0 {
 		return nil, errors.New("sftp: maximum list entries must be positive")
 	}
+	timeout := defaultTimeout(configuration.Timeout)
+	maxList := defaultMaxList(configuration.MaxListEntries)
 
 	sshConfiguration := &ssh.ClientConfig{
 		User:            configuration.User,
@@ -226,7 +220,7 @@ func (a *Adapter) Open(ctx context.Context, logicalPath filesystem.Path) (io.Rea
 
 // OpenRange opens a bounded range without buffering the whole remote file.
 func (a *Adapter) OpenRange(ctx context.Context, logicalPath filesystem.Path, byteRange filesystem.ByteRange) (io.ReadCloser, error) {
-	if byteRange.Offset < 0 || byteRange.Length <= 0 || byteRange.Offset > byteRange.Offset+byteRange.Length-1 {
+	if !validByteRange(byteRange) {
 		return nil, fmt.Errorf("%w: offset=%d length=%d", filesystem.ErrInvalidRange, byteRange.Offset, byteRange.Length)
 	}
 	file, err := withSession(a, ctx, true, func(session remoteSession) (remoteFile, error) {
@@ -366,17 +360,14 @@ func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options f
 	if options.Limit < 0 {
 		return nil, errors.New("sftp: list limit must not be negative")
 	}
-	limit := options.Limit
-	if limit == 0 || limit > a.maxList {
-		limit = a.maxList
-	}
+	limit := effectiveListLimit(options.Limit, a.maxList)
 	entries, err := withSession(a, ctx, true, func(session remoteSession) ([]filesystem.Entry, error) {
 		return a.list(ctx, session, directory, options.Recursive, limit)
 	})
 	if err != nil {
 		return nil, mapError(directory, err)
 	}
-	return &iterator{entries: entries, index: -1}, nil
+	return &iterator{entries: entries}, nil
 }
 
 func (a *Adapter) list(ctx context.Context, session remoteSession, directory filesystem.Path, recursive bool, limit int) ([]filesystem.Entry, error) {
@@ -387,16 +378,19 @@ func (a *Adapter) list(ctx context.Context, session remoteSession, directory fil
 	}
 	queue := []filesystem.Path{directory}
 	entries := make([]filesystem.Entry, 0, min(limit, 128))
-	for len(queue) > 0 && len(entries) < limit {
+	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
 		infos, err := session.ReadDirContext(ctx, a.remotePath(current))
 		if err != nil {
 			return nil, err
 		}
-		sort.Slice(infos, func(left, right int) bool { return infos[left].Name() < infos[right].Name() })
+		slices.SortFunc(infos, func(left, right fs.FileInfo) int {
+			return strings.Compare(left.Name(), right.Name())
+		})
 		for _, info := range infos {
-			if info.Mode()&fs.ModeSymlink != 0 {
+			switch info.Mode().Type() {
+			case fs.ModeSymlink:
 				return nil, fmt.Errorf("sftp: symbolic link %q is denied", info.Name())
 			}
 			logicalPath, err := current.Join(info.Name())
@@ -411,13 +405,20 @@ func (a *Adapter) list(ctx context.Context, session remoteSession, directory fil
 				}
 			}
 			entries = append(entries, filesystem.Entry{Path: logicalPath, Kind: kind, Size: info.Size(), Modified: info.ModTime()})
-			if len(entries) == limit {
-				break
+			if len(entries) >= limit {
+				sortEntries(entries)
+				return entries, nil
 			}
 		}
 	}
-	sort.Slice(entries, func(left, right int) bool { return entries[left].Path.String() < entries[right].Path.String() })
+	sortEntries(entries)
 	return entries, nil
+}
+
+func sortEntries(entries []filesystem.Entry) {
+	slices.SortFunc(entries, func(left, right filesystem.Entry) int {
+		return strings.Compare(left.Path.String(), right.Path.String())
+	})
 }
 
 // Copy streams into a temporary destination and requires explicit overwrite
@@ -537,7 +538,10 @@ func withSession[T any](a *Adapter, ctx context.Context, retry bool, operation f
 		return zero, err
 	}
 	result, err := operation(session)
-	if err == nil || !retry || !isConnectionError(err) {
+	if err == nil {
+		return result, nil
+	}
+	if !retry || !isConnectionError(err) {
 		return result, err
 	}
 	a.invalidate(session)
@@ -559,10 +563,11 @@ func (a *Adapter) invalidate(failed remoteSession) {
 
 func (a *Adapter) rejectSymlinks(session remoteSession, logicalPath filesystem.Path, includeFinal bool) error {
 	segments := strings.Split(logicalPath.String(), "/")
-	if !includeFinal && len(segments) > 0 {
-		segments = segments[:len(segments)-1]
+	segmentCount := len(segments)
+	if !includeFinal {
+		segmentCount--
 	}
-	for index := range segments {
+	for index := range segments[:segmentCount] {
 		candidate := path.Join(a.root, path.Join(segments[:index+1]...))
 		info, err := session.Lstat(candidate)
 		if isNotFound(err) {
@@ -571,7 +576,8 @@ func (a *Adapter) rejectSymlinks(session remoteSession, logicalPath filesystem.P
 		if err != nil {
 			return err
 		}
-		if info.Mode()&fs.ModeSymlink != 0 {
+		switch info.Mode().Type() {
+		case fs.ModeSymlink:
 			return fmt.Errorf("sftp: symbolic link %q is denied", candidate)
 		}
 	}
@@ -621,10 +627,12 @@ type contextReader struct {
 }
 
 func (r contextReader) Read(buffer []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
+	select {
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	default:
+		return r.reader.Read(buffer)
 	}
-	return r.reader.Read(buffer)
 }
 
 type contextReadCloser struct {
@@ -648,10 +656,12 @@ func newContextReadCloser(ctx context.Context, file remoteFile) *contextReadClos
 }
 
 func (r *contextReadCloser) Read(buffer []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
+	select {
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	default:
+		return r.file.Read(buffer)
 	}
-	return r.file.Read(buffer)
 }
 
 func (r *contextReadCloser) Close() error {
@@ -670,24 +680,27 @@ type limitedReadCloser struct {
 func (r *limitedReadCloser) Close() error { return r.closer.Close() }
 
 type iterator struct {
-	entries []filesystem.Entry
-	index   int
-	closed  bool
+	entries    []filesystem.Entry
+	current    filesystem.Entry
+	hasCurrent bool
+	closed     bool
 }
 
 func (i *iterator) Next() bool {
-	if i.closed || i.index+1 >= len(i.entries) {
+	if i.closed || len(i.entries) == 0 {
 		return false
 	}
-	i.index++
+	i.current = i.entries[0]
+	i.entries = i.entries[1:]
+	i.hasCurrent = true
 	return true
 }
 
 func (i *iterator) Entry() filesystem.Entry {
-	if i.index < 0 || i.index >= len(i.entries) {
+	if !i.hasCurrent {
 		return filesystem.Entry{}
 	}
-	return i.entries[i.index]
+	return i.current
 }
 
 func (i *iterator) Err() error { return nil }
@@ -701,7 +714,10 @@ func validateRoot(root string) (string, error) {
 	if root == "" {
 		return "/", nil
 	}
-	if !strings.HasPrefix(root, "/") || strings.Contains(root, `\`) {
+	if !strings.HasPrefix(root, "/") {
+		return "", errors.New("sftp: root must be an absolute POSIX path")
+	}
+	if strings.Contains(root, `\`) {
 		return "", errors.New("sftp: root must be an absolute POSIX path")
 	}
 	for _, segment := range strings.Split(root, "/") {
@@ -715,6 +731,35 @@ func validateRoot(root string) (string, error) {
 		}
 	}
 	return path.Clean(root), nil
+}
+
+func defaultTimeout(timeout time.Duration) time.Duration {
+	if timeout == 0 {
+		return 30 * time.Second
+	}
+	return timeout
+}
+
+func defaultMaxList(limit int) int {
+	if limit == 0 {
+		return 10_000
+	}
+	return limit
+}
+
+func effectiveListLimit(requested, maximum int) int {
+	if requested == 0 {
+		return maximum
+	}
+	return min(requested, maximum)
+}
+
+func validByteRange(byteRange filesystem.ByteRange) bool {
+	if byteRange.Offset < 0 || byteRange.Length <= 0 {
+		return false
+	}
+	maximum := int64(^uint64(0) >> 1)
+	return byteRange.Length-1 <= maximum-byteRange.Offset
 }
 
 func temporaryPath(directory string, randomSource io.Reader) (string, error) {
