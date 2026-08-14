@@ -6,6 +6,10 @@ Versioning after its first release.
 
 ## [Unreleased]
 
+### Documentation
+
+- Link the package README to the repository-wide Golib documentation portal.
+
 ### Fixed
 
 - Make local create-only writes publish with an atomic hard-link operation so
