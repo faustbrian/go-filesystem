@@ -210,11 +210,13 @@ func TestFaultWriterModelsShortWritesAndLatency(t *testing.T) {
 func TestTCPFaultProxyInjectsBidirectionalNetworkFaults(t *testing.T) {
 	t.Parallel()
 
-	upstream := startEchoServer(t)
+	const latency = 5 * time.Millisecond
+
+	upstream, accepted := startEchoServer(t)
 	proxy, err := filesystemtest.NewTCPFaultProxy(upstream, filesystemtest.TCPFaultProxyOptions{
 		ClientToServer: filesystemtest.TCPFaultDirection{
 			DisconnectAfter: 3,
-			Latency:         5 * time.Millisecond,
+			Latency:         latency,
 			CorruptOffsets:  []int64{1},
 		},
 		ServerToClient: filesystemtest.TCPFaultDirection{CorruptOffsets: []int64{2}},
@@ -227,12 +229,14 @@ func TestTCPFaultProxyInjectsBidirectionalNetworkFaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	<-accepted
+	time.Sleep(2 * latency)
 	started := time.Now()
 	if _, err := connection.Write([]byte("abcdef")); err != nil {
 		t.Fatal(err)
 	}
 	content, _ := io.ReadAll(connection)
-	if elapsed := time.Since(started); elapsed < 5*time.Millisecond {
+	if elapsed := time.Since(started); elapsed < latency {
 		t.Fatalf("transfer elapsed = %s, want injected latency", elapsed)
 	}
 	want := []byte{'a', ^byte('b'), ^byte('c')}
@@ -259,13 +263,14 @@ func TestTCPFaultProxyRejectsInvalidUpstream(t *testing.T) {
 	}
 }
 
-func startEchoServer(t *testing.T) string {
+func startEchoServer(t *testing.T) (string, <-chan struct{}) {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	done := make(chan struct{})
+	accepted := make(chan struct{}, 1)
 	go func() {
 		defer close(done)
 		for {
@@ -273,6 +278,7 @@ func startEchoServer(t *testing.T) string {
 			if err != nil {
 				return
 			}
+			accepted <- struct{}{}
 			go func() {
 				defer func() { _ = connection.Close() }()
 				_, _ = io.Copy(connection, connection)
@@ -283,7 +289,7 @@ func startEchoServer(t *testing.T) string {
 		_ = listener.Close()
 		<-done
 	})
-	return listener.Addr().String()
+	return listener.Addr().String(), accepted
 }
 
 func TestFaultIteratorFailsAtBoundaryAndTracksClose(t *testing.T) {

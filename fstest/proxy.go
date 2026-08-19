@@ -13,7 +13,7 @@ type TCPFaultDirection struct {
 	// DisconnectAfter closes the write half after this many forwarded bytes.
 	// Zero disables the cutoff.
 	DisconnectAfter int64
-	// Latency delays each socket read.
+	// Latency delays each forwarded chunk after it arrives from the source.
 	Latency time.Duration
 	// CorruptOffsets identifies absolute byte offsets to invert.
 	CorruptOffsets []int64
@@ -131,10 +131,13 @@ func (p *TCPFaultProxy) copyDirection(destination, source net.Conn, direction TC
 	reader := NewFaultReader(source, FaultReaderOptions{
 		FailAfter:      failAfter,
 		Err:            io.EOF,
-		Latency:        direction.Latency,
 		CorruptOffsets: direction.CorruptOffsets,
 	})
-	_, _ = io.Copy(destination, reader)
+	writer := NewFaultWriter(destination, FaultWriterOptions{
+		FailAfter: -1,
+		Latency:   direction.Latency,
+	})
+	_, _ = io.Copy(writer, reader)
 	if connection, ok := destination.(*net.TCPConn); ok {
 		_ = connection.CloseWrite()
 	} else {

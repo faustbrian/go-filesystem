@@ -12,6 +12,8 @@ Versioning after its first release.
 
 ### Fixed
 
+- Apply TCP fault-proxy latency after source data arrives so idle connections
+  cannot consume the configured transport delay before a transfer begins.
 - Make local create-only writes publish with an atomic hard-link operation so
   concurrent `IfNoneMatch` writers cannot overwrite the first object.
 

@@ -168,48 +168,82 @@ func TestNewRejectsUnsafeOrIncompleteConfiguration(t *testing.T) {
 
 	secureTLS := &tls.Config{ServerName: "ftp.example.test", MinVersion: tls.VersionTLS12}
 	valid := Config{
-		Address:   "ftp.example.test:21",
+		Address:   "127.0.0.1:1",
 		Username:  "user",
 		Password:  "super-secret-credential",
 		TLSMode:   TLSExplicit,
 		TLSConfig: secureTLS,
+		Timeout:   time.Millisecond,
 	}
-	tests := map[string]func(*Config){
-		"missing address":  func(config *Config) { config.Address = "" },
-		"missing username": func(config *Config) { config.Username = "" },
-		"missing password": func(config *Config) { config.Password = "" },
-		"missing TLS":      func(config *Config) { config.TLSConfig = nil },
-		"insecure TLS": func(config *Config) {
-			config.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+	tests := map[string]struct {
+		mutate    func(*Config)
+		wantError string
+	}{
+		"missing address": {
+			mutate: func(config *Config) { config.Address = "" }, wantError: "address is required",
 		},
-		"plaintext without opt in": func(config *Config) {
-			config.TLSMode = TLSPlaintext
-			config.TLSConfig = nil
+		"missing username": {
+			mutate: func(config *Config) { config.Username = "" }, wantError: "username is required",
 		},
-		"invalid root": func(config *Config) {
-			configurePlaintext(config)
-			config.Root = "../escape"
+		"missing password": {
+			mutate: func(config *Config) { config.Password = "" }, wantError: "password is required",
 		},
-		"invalid TLS mode":  func(config *Config) { config.TLSMode = TLSMode(99) },
-		"invalid data mode": func(config *Config) { config.DataMode = DataMode(99) },
-		"negative timeout": func(config *Config) {
-			configurePlaintext(config)
-			config.Timeout = -time.Second
+		"missing TLS": {
+			mutate: func(config *Config) { config.TLSConfig = nil }, wantError: "TLS configuration is required",
 		},
-		"negative list bound": func(config *Config) {
-			configurePlaintext(config)
-			config.MaxListEntries = -1
+		"insecure TLS": {
+			mutate: func(config *Config) {
+				config.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+			},
+			wantError: "TLS certificate verification must be enabled",
+		},
+		"plaintext without opt in": {
+			mutate: func(config *Config) {
+				config.TLSMode = TLSPlaintext
+				config.TLSConfig = nil
+			},
+			wantError: "plaintext credentials require explicit opt-in",
+		},
+		"invalid root": {
+			mutate: func(config *Config) {
+				configurePlaintext(config)
+				config.Root = "../escape"
+			},
+			wantError: "root must be an absolute POSIX path",
+		},
+		"invalid TLS mode": {
+			mutate: func(config *Config) { config.TLSMode = TLSMode(99) }, wantError: "invalid TLS mode",
+		},
+		"invalid data mode": {
+			mutate: func(config *Config) { config.DataMode = DataMode(99) }, wantError: "invalid data mode",
+		},
+		"negative timeout": {
+			mutate: func(config *Config) {
+				configurePlaintext(config)
+				config.Timeout = -time.Second
+			},
+			wantError: "timeout must not be negative",
+		},
+		"negative list bound": {
+			mutate: func(config *Config) {
+				configurePlaintext(config)
+				config.MaxListEntries = -1
+			},
+			wantError: "maximum list entries must be positive",
 		},
 	}
-	for name, mutate := range tests {
-		name, mutate := name, mutate
+	for name, test := range tests {
+		name, test := name, test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			configuration := valid
-			mutate(&configuration)
+			test.mutate(&configuration)
 			_, err := New(context.Background(), configuration)
 			if err == nil {
 				t.Fatal("New() error = nil")
+			}
+			if !strings.Contains(err.Error(), test.wantError) {
+				t.Fatalf("New() error = %v, want %q", err, test.wantError)
 			}
 			if strings.Contains(err.Error(), valid.Password) {
 				t.Fatalf("New() error leaked password: %v", err)
