@@ -20,8 +20,8 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	awstypes "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
-	"github.com/faustbrian/golib/pkg/filesystem/fstest"
+	filesystem "github.com/faustbrian/go-filesystem"
+	"github.com/faustbrian/go-filesystem/fstest"
 )
 
 func TestConformance(t *testing.T) {

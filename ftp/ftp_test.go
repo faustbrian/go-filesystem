@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
-	"github.com/faustbrian/golib/pkg/filesystem/fstest"
+	filesystem "github.com/faustbrian/go-filesystem"
+	"github.com/faustbrian/go-filesystem/fstest"
 	protocolserver "github.com/gonzalop/ftp/server"
 )
 

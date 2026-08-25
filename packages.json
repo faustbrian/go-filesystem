@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-filesystem",
+  "packages": [
+    {
+      "module_directory": ".",
+      "directory": ".",
+      "name": "filesystem",
+      "import_path": "github.com/faustbrian/go-filesystem",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "decorator",
+      "name": "decorator",
+      "import_path": "github.com/faustbrian/go-filesystem/decorator",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "fstest",
+      "name": "fstest",
+      "import_path": "github.com/faustbrian/go-filesystem/fstest",
+      "kind": "test support",
+      "production": false,
+      "executable": true,
+      "coverage_required": false,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "ftp",
+      "name": "ftp",
+      "import_path": "github.com/faustbrian/go-filesystem/ftp",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "internal/redact",
+      "name": "redact",
+      "import_path": "github.com/faustbrian/go-filesystem/internal/redact",
+      "kind": "internal",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "internal/streamwriter",
+      "name": "streamwriter",
+      "import_path": "github.com/faustbrian/go-filesystem/internal/streamwriter",
+      "kind": "internal",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "local",
+      "name": "local",
+      "import_path": "github.com/faustbrian/go-filesystem/local",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "memory",
+      "name": "memory",
+      "import_path": "github.com/faustbrian/go-filesystem/memory",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "r2",
+      "name": "r2",
+      "import_path": "github.com/faustbrian/go-filesystem/r2",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "s3",
+      "name": "s3",
+      "import_path": "github.com/faustbrian/go-filesystem/s3",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "sftp",
+      "name": "sftp",
+      "import_path": "github.com/faustbrian/go-filesystem/sftp",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    }
+  ]
+}

@@ -14,9 +14,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
-	"github.com/faustbrian/golib/pkg/filesystem/fstest"
-	filesystemS3 "github.com/faustbrian/golib/pkg/filesystem/s3"
+	filesystem "github.com/faustbrian/go-filesystem"
+	"github.com/faustbrian/go-filesystem/fstest"
+	filesystemS3 "github.com/faustbrian/go-filesystem/s3"
 )
 
 func TestCompatibleServiceConformance(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"io"
 	"strings"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
-	"github.com/faustbrian/golib/pkg/filesystem/memory"
+	filesystem "github.com/faustbrian/go-filesystem"
+	"github.com/faustbrian/go-filesystem/memory"
 )
 
 func Example() {

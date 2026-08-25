@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
-	"github.com/faustbrian/golib/pkg/filesystem/fstest"
-	"github.com/faustbrian/golib/pkg/filesystem/local"
+	filesystem "github.com/faustbrian/go-filesystem"
+	"github.com/faustbrian/go-filesystem/fstest"
+	"github.com/faustbrian/go-filesystem/local"
 )
 
 func TestConformance(t *testing.T) {

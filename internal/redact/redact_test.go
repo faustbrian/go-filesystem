@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/faustbrian/golib/pkg/filesystem/internal/redact"
+	"github.com/faustbrian/go-filesystem/internal/redact"
 )
 
 func TestErrorRedactsCredentialsAndPreservesCause(t *testing.T) {

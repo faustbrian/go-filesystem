@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/faustbrian/golib/pkg/filesystem/fstest"
+	"github.com/faustbrian/go-filesystem/fstest"
 	pkgsftp "github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )

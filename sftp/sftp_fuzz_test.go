@@ -5,7 +5,7 @@ import (
 	"io/fs"
 	"testing"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
+	filesystem "github.com/faustbrian/go-filesystem"
 )
 
 func FuzzMalformedListingInfo(f *testing.F) {

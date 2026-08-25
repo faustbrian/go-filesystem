@@ -19,8 +19,8 @@ import (
 	"time"
 	"unicode"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
-	"github.com/faustbrian/golib/pkg/filesystem/internal/streamwriter"
+	filesystem "github.com/faustbrian/go-filesystem"
+	"github.com/faustbrian/go-filesystem/internal/streamwriter"
 	protocol "github.com/gonzalop/ftp"
 )
 

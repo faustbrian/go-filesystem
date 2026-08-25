@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
+	filesystem "github.com/faustbrian/go-filesystem"
 )
 
 func TestNewBuildsCloudflareProfile(t *testing.T) {

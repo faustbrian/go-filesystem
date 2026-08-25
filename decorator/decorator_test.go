@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
-	"github.com/faustbrian/golib/pkg/filesystem/fstest"
-	"github.com/faustbrian/golib/pkg/filesystem/memory"
+	filesystem "github.com/faustbrian/go-filesystem"
+	"github.com/faustbrian/go-filesystem/fstest"
+	"github.com/faustbrian/go-filesystem/memory"
 )
 
 func TestPrefixConformanceAndIsolation(t *testing.T) {

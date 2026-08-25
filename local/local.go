@@ -18,8 +18,8 @@ import (
 	"slices"
 	"strings"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
-	"github.com/faustbrian/golib/pkg/filesystem/internal/streamwriter"
+	filesystem "github.com/faustbrian/go-filesystem"
+	"github.com/faustbrian/go-filesystem/internal/streamwriter"
 )
 
 var capabilities = filesystem.NewCapabilitySet(

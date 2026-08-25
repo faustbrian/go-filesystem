@@ -19,9 +19,9 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	awstypes "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
-	"github.com/faustbrian/golib/pkg/filesystem/internal/redact"
-	"github.com/faustbrian/golib/pkg/filesystem/internal/streamwriter"
+	filesystem "github.com/faustbrian/go-filesystem"
+	"github.com/faustbrian/go-filesystem/internal/redact"
+	"github.com/faustbrian/go-filesystem/internal/streamwriter"
 )
 
 const (

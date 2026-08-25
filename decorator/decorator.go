@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
+	filesystem "github.com/faustbrian/go-filesystem"
 )
 
 // Backend is the common adapter surface wrapped by decorators. Optional

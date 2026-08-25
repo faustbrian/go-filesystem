@@ -1,5 +1,15 @@
 # filesystem
 
+[![CI](https://github.com/faustbrian/go-filesystem/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/faustbrian/go-filesystem/actions/workflows/ci.yml)
+[![CodeQL](https://img.shields.io/badge/CodeQL-required-blue)](https://github.com/faustbrian/go-filesystem/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-100%25_required-blue)](CONTRIBUTING.md#verification)
+[![Mutation](https://img.shields.io/badge/mutation-100%25_required-blue)](CONTRIBUTING.md#verification)
+[![Documentation](https://img.shields.io/badge/docs-checked_in_CI-blue)](docs/)
+[![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-filesystem.svg)](https://pkg.go.dev/github.com/faustbrian/go-filesystem)
+[![Release](https://img.shields.io/github/v/release/faustbrian/go-filesystem?sort=semver)](https://github.com/faustbrian/go-filesystem/releases)
+[![Go](https://img.shields.io/badge/go-1.26.6-00ADD8?logo=go)](https://go.dev/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 `filesystem` is a capability-based, streaming filesystem abstraction for
 Go. It supports local files, deterministic in-memory storage, Amazon S3,
 Cloudflare R2, SFTP, and FTP without claiming that those backends provide the

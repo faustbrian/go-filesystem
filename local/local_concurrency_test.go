@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
-	"github.com/faustbrian/golib/pkg/filesystem/local"
+	filesystem "github.com/faustbrian/go-filesystem"
+	"github.com/faustbrian/go-filesystem/local"
 )
 
 func TestConcurrentCreateOnlyWritesPublishExactlyOnce(t *testing.T) {

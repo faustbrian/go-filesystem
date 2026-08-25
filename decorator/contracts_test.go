@@ -1,13 +1,13 @@
 package decorator_test
 
 import (
-	"github.com/faustbrian/golib/pkg/filesystem/decorator"
-	filesystemFTP "github.com/faustbrian/golib/pkg/filesystem/ftp"
-	filesystemLocal "github.com/faustbrian/golib/pkg/filesystem/local"
-	filesystemMemory "github.com/faustbrian/golib/pkg/filesystem/memory"
-	filesystemR2 "github.com/faustbrian/golib/pkg/filesystem/r2"
-	filesystemS3 "github.com/faustbrian/golib/pkg/filesystem/s3"
-	filesystemSFTP "github.com/faustbrian/golib/pkg/filesystem/sftp"
+	"github.com/faustbrian/go-filesystem/decorator"
+	filesystemFTP "github.com/faustbrian/go-filesystem/ftp"
+	filesystemLocal "github.com/faustbrian/go-filesystem/local"
+	filesystemMemory "github.com/faustbrian/go-filesystem/memory"
+	filesystemR2 "github.com/faustbrian/go-filesystem/r2"
+	filesystemS3 "github.com/faustbrian/go-filesystem/s3"
+	filesystemSFTP "github.com/faustbrian/go-filesystem/sftp"
 )
 
 var (

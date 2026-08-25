@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
+	filesystem "github.com/faustbrian/go-filesystem"
 	protocol "github.com/gonzalop/ftp"
 )
 

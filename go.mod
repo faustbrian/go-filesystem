@@ -1,4 +1,4 @@
-module github.com/faustbrian/golib/pkg/filesystem
+module github.com/faustbrian/go-filesystem
 
 go 1.26.6
 

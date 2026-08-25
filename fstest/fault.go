@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	filesystem "github.com/faustbrian/golib/pkg/filesystem"
+	filesystem "github.com/faustbrian/go-filesystem"
 )
 
 // FaultReaderOptions controls deterministic stream failure injection.

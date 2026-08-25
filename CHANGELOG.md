@@ -6,6 +6,8 @@ Versioning after its first release.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-25
+
 ### Documentation
 
 - Link the package README to the repository-wide Golib documentation portal.
@@ -42,6 +44,10 @@ Versioning after its first release.
 
 ### Changed
 
+- Publish the module from its standalone `github.com/faustbrian/go-filesystem` identity while preserving its documented API and behavior.
 - FTP explicit and implicit TLS configurations now fail before dialing because
   the pinned protocol client cannot safely complete protected data transfers.
   Plaintext passive and active modes are covered by real transfer tests.
+
+[Unreleased]: https://github.com/faustbrian/go-filesystem/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/faustbrian/go-filesystem/releases/tag/v1.0.0
