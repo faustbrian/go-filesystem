@@ -192,7 +192,7 @@ run_benchmark() {
 
     set +e
     if target="$(find_make_target benchmark performance)"; then
-        package_make GOWORK=off "${target}" 2>&1 | tee "${temporary}"
+        make GOWORK=off "${target}" 2>&1 | tee "${temporary}"
         status=${PIPESTATUS[0]}
     else
         GOWORK=off go test ./... -run '^$' -bench . -benchmem 2>&1 |
@@ -225,7 +225,7 @@ run_make_evidence() {
     rm -f "${output}" "${temporary}"
 
     set +e
-    package_make "${target}" 2>&1 | tee "${temporary}"
+    make "${target}" 2>&1 | tee "${temporary}"
     status=${PIPESTATUS[0]}
     set -e
 
