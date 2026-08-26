@@ -31,7 +31,7 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ### Documentation
 
-- Link the package README to the repository-wide Golib documentation portal.
+- Link the package README to package-owned documentation.
 
 ### Fixed
 
