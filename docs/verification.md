@@ -1,4 +1,4 @@
-# Hardening and test matrix
+# Verification matrix
 
 This matrix identifies the executable evidence behind each portability and
 failure guarantee. Unit and in-process integration tests run in `go test

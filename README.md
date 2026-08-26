@@ -76,7 +76,7 @@ wraps `filesystem.ErrUnsupportedCapability`.
 
 See the [capability matrix](docs/capabilities.md),
 [adapter guide](docs/adapters.md), [decorator guide](docs/decorators.md),
-[operations guide](docs/operations.md), [hardening matrix](docs/hardening.md),
+[operations guide](docs/operations.md), [verification matrix](docs/verification.md),
 and [security policy](SECURITY.md).
 The module requires Go 1.26 or newer.
 
@@ -89,8 +89,3 @@ Azure Blob Storage are intentionally outside the initial release.
 ## License
 
 Licensed under the [MIT License](LICENSE).
-
-## Ecosystem
-
-Use the [Golib documentation portal](https://github.com/faustbrian/golib/blob/main/docs/index.md)
-to choose companion packages, supported stacks, recipes, and operations guidance.

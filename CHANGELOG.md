@@ -1,10 +1,14 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The
-format follows Keep a Changelog and the project intends to use Semantic
-Versioning after its first release.
+format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
+
+### Documentation
+
+- Replace archived monorepo and hardening terminology with package-owned
+  documentation and a verification matrix.
 
 ## [1.0.0] - 2026-08-25
 
