@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-filesystem",
+  "module": ".",
+  "package": "s3",
+  "gate": "mutation",
+  "input_digest": "sha256:36ea8c96cf3366048bb77ad53d92978637e2955d77f728c59886faca4bb1dd8b",
+  "verifier_digest": "sha256:9a9499ff68a8dfd49a0be7995590297a8ee563a1aa226bfd8b9361dc53058108",
+  "result": "passed",
+  "report_digest": "sha256:66b22297b5a89e1988d4a76abd7e237c3551bbae1b77678de960b98f7bd32c24",
+  "environment": {
+    "CGO_ENABLED": "1",
+    "GOARCH": "arm64",
+    "GOOS": "darwin",
+    "GOVERSION": "go1.26.6",
+    "evidence_origin": "approved_legacy_checkpoint"
+  },
+  "completed_at": "2026-08-29T04:23:45.09353Z"
+}

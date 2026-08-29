@@ -1,10 +1,20 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The
-format follows Keep a Changelog and the project intends to use Semantic
-Versioning after its first release.
+format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
+
+### Changed
+
+- Adopt the immutable shared Go library tooling contract while retaining the
+  package-owned manifests, API baseline, fixtures, and approved mutation
+  evidence.
+
+### Documentation
+
+- Replace archived monorepo and hardening terminology with package-owned
+  documentation and a verification matrix.
 
 ## [1.0.0] - 2026-08-25
 
@@ -27,7 +37,7 @@ Versioning after its first release.
 
 ### Documentation
 
-- Link the package README to the repository-wide Golib documentation portal.
+- Link the package README to package-owned documentation.
 
 ### Fixed
 
