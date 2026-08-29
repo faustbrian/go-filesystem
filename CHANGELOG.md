@@ -11,6 +11,9 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
   package-owned manifests, API baseline, fixtures, and approved mutation
   evidence.
 
+- Pin the repository contract to the released `go-library-tools` v1.0.6
+  workflow and checksum-verified tool identity.
+
 ### Documentation
 
 - Replace archived monorepo and hardening terminology with package-owned
