@@ -4,6 +4,11 @@ This matrix identifies the executable evidence behind each portability and
 failure guarantee. Unit and in-process integration tests run in `go test
 ./...`; the pinned S3-compatible service runs in the integration workflow.
 
+Local commands and CI use the same strict contract through the v1.0.6
+`go-library-tools` release pinned in `.golib.yaml`. The repository keeps only
+package policy, source-specific evidence, and fixtures; shared gate
+implementation is supplied by the pinned tool.
+
 ## Adapter conformance
 
 | Adapter | Shared conformance | Real boundary | Adapter-specific evidence |
