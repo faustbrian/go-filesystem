@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-filesystem",
+  "module": ".",
+  "package": "internal/streamwriter",
+  "gate": "mutation",
+  "input_digest": "sha256:4f66a3b211a642d26285d97dddda25ce6d38b19d322da77123e9adcb2a77c2bc",
+  "verifier_digest": "sha256:9a9499ff68a8dfd49a0be7995590297a8ee563a1aa226bfd8b9361dc53058108",
+  "result": "passed",
+  "report_digest": "sha256:a86d9dc2be39ace8119ca83e9e434f7f9a8908570e4e44a192724a2ab0a03ef5",
+  "environment": {
+    "CGO_ENABLED": "1",
+    "GOARCH": "arm64",
+    "GOOS": "darwin",
+    "GOVERSION": "go1.26.6",
+    "evidence_origin": "approved_legacy_checkpoint"
+  },
+  "completed_at": "2026-08-29T04:23:44.073319Z"
+}

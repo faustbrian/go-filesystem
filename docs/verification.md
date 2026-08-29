@@ -48,22 +48,20 @@ bounds can be lowered or raised explicitly; exceeding them returns an error.
 
 ## Required gates
 
+The shared v1 contract runs formatting, static analysis, tests, exact package
+coverage, race checks, the fuzz and benchmark operations declared in
+`.golib.yaml`, security checks, API compatibility, documentation, and
+mutation verification:
+
 ```sh
-test -z "$(gofmt -l .)"
-go vet ./...
-go test ./...
-scripts/check-coverage.sh
-go test -race ./...
-go test -run '^$' -fuzz '^FuzzParsePath$' -fuzztime=10s .
-go test -run '^$' -fuzz '^FuzzSymlinkContainment$' -fuzztime=10s ./local
-go test -run '^$' -fuzz '^FuzzMetadataAndListings$' -fuzztime=10s ./memory
-go test -run '^$' -fuzz '^FuzzLogicalKeyTranslation$' -fuzztime=10s ./s3
-go test -run '^$' -fuzz '^FuzzMalformedListingEntry$' -fuzztime=10s ./ftp
-go test -run '^$' -fuzz '^FuzzMalformedListingInfo$' -fuzztime=10s ./sftp
-go test -run '^$' -fuzz '^FuzzErrorRedaction$' -fuzztime=10s ./internal/redact
-go test -run '^$' -bench 'Benchmark(LargeObjectStreaming|Streaming|Listing)$' \
-  -benchtime=1x -benchmem ./local ./memory
-go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+make check
+```
+
+Repository structure, manifest, workflow, and shared configuration validation
+run through the complete local contract:
+
+```sh
+make ci
 ```
 
 The integration workflow additionally starts its pinned MinIO image and runs

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-filesystem",
+  "module": ".",
+  "package": "ftp",
+  "gate": "mutation",
+  "input_digest": "sha256:6f005076d39871cdf73b24b8ccf640478424d53c78e6c8c2b37f9754246838b1",
+  "verifier_digest": "sha256:9a9499ff68a8dfd49a0be7995590297a8ee563a1aa226bfd8b9361dc53058108",
+  "result": "passed",
+  "report_digest": "sha256:8624ef81bcdbb75297b8850e9f9427c8a4459fea419669fc065059eebf8a3785",
+  "environment": {
+    "CGO_ENABLED": "1",
+    "GOARCH": "arm64",
+    "GOOS": "darwin",
+    "GOVERSION": "go1.26.6",
+    "evidence_origin": "approved_legacy_checkpoint"
+  },
+  "completed_at": "2026-08-29T04:23:43.585463Z"
+}

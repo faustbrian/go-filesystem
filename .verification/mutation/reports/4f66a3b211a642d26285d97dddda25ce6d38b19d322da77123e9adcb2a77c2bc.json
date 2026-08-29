@@ -1,0 +1,27 @@
+{
+    "go_module": "github.com/faustbrian/golib/pkg/filesystem",
+    "files": [
+      {
+        "file_name": "writer.go",
+        "mutations": [
+          {
+            "type": "INVERT_BITWISE",
+            "status": "KILLED",
+            "line": 30,
+            "column": 9
+          }
+        ]
+      }
+    ],
+    "test_efficacy": 100,
+    "mutations_coverage": 100,
+    "mutants_total": 1,
+    "mutants_killed": 1,
+    "mutants_lived": 0,
+    "mutants_not_viable": 0,
+    "mutants_not_covered": 0,
+    "elapsed_time": 0.297236334,
+    "mutator_statistics": {
+      "invert_bitwise": 1
+    }
+  }

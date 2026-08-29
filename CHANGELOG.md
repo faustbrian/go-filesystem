@@ -5,6 +5,12 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Adopt the immutable shared Go library tooling contract while retaining the
+  package-owned manifests, API baseline, fixtures, and approved mutation
+  evidence.
+
 ### Documentation
 
 - Replace archived monorepo and hardening terminology with package-owned

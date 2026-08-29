@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-filesystem",
+  "module": ".",
+  "package": "decorator",
+  "gate": "mutation",
+  "input_digest": "sha256:2eb2d0b0966f8ac77db18ee0051a243d0f604fa118bc6a63dfca46e59ea7154a",
+  "verifier_digest": "sha256:9a9499ff68a8dfd49a0be7995590297a8ee563a1aa226bfd8b9361dc53058108",
+  "result": "passed",
+  "report_digest": "sha256:e270d1a1e543a053521bca106cd2dbd71618a57d65887fba59e8bf9f50d0d4e7",
+  "environment": {
+    "CGO_ENABLED": "1",
+    "GOARCH": "arm64",
+    "GOOS": "darwin",
+    "GOVERSION": "go1.26.6",
+    "evidence_origin": "approved_legacy_checkpoint"
+  },
+  "completed_at": "2026-08-29T04:23:43.299705Z"
+}
