@@ -11,7 +11,7 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
   package-owned manifests, API baseline, fixtures, and approved mutation
   evidence.
 
-- Pin the repository contract to the released `go-library-tools` v1.0.6
+- Pin the repository contract to the released `go-library-tools` v1.0.13
   workflow and checksum-verified tool identity.
 
 ### Documentation
