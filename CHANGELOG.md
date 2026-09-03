@@ -5,17 +5,25 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Security
+
+- Update `golang.org/x/crypto` to v0.56.0 so SFTP SSH channel handling includes
+  the fixes for GO-2026-6354 and GO-2026-6355 denial-of-service conditions.
+
 ### Changed
 
 - Adopt the immutable shared Go library tooling contract while retaining the
   package-owned manifests, API baseline, fixtures, and approved mutation
   evidence.
 
-- Pin the repository contract to the released `go-library-tools` v1.0.6
-  workflow and checksum-verified tool identity.
+- Adopt the checksum-verified `go-library-tools` v1.3.0 CLI, schema-v2
+  cohesion metadata, and repository-local cohesion gate.
+- Pin reusable CI to the immutable v1.3.0 cohesion workflow.
 
 ### Documentation
 
+- Link the module to the immutable v1.3.0 Golib ecosystem guidance and
+  correct its released lifecycle and exact Go baseline.
 - Replace archived monorepo and hardening terminology with package-owned
   documentation and a verification matrix.
 
