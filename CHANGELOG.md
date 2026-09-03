@@ -12,6 +12,9 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ### Changed
 
+- Adopt the checksum-verified `go-library-tools` v1.4.0 CLI and immutable W14
+  reusable workflow without changing the filesystem API or runtime behavior.
+
 - Adopt the immutable shared Go library tooling contract while retaining the
   package-owned manifests, API baseline, fixtures, and approved mutation
   evidence.
@@ -21,6 +24,9 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 - Pin reusable CI to the immutable v1.3.0 cohesion workflow.
 
 ### Documentation
+
+- Link ecosystem and Integration and Data Movement family guidance to the
+  immutable v1.4.0 documentation release.
 
 - Link the module to the immutable v1.3.0 Golib ecosystem guidance and
   correct its released lifecycle and exact Go baseline.
