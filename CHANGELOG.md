@@ -5,6 +5,11 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Security
+
+- Update `golang.org/x/crypto` to v0.56.0 so SFTP SSH channel handling includes
+  the fixes for GO-2026-6354 and GO-2026-6355 denial-of-service conditions.
+
 ### Changed
 
 - Adopt the immutable shared Go library tooling contract while retaining the
