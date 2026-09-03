@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "repository": "github.com/faustbrian/go-filesystem",
   "go_version": "1.26.6",
   "modules": [
@@ -149,6 +149,113 @@
       "family_label": "Integration And Data Movement",
       "family_description": "Bounded external I/O, data movement, provider boundaries, and derived search state.",
       "family_order": 7,
+      "cohesion": {
+        "family": "integration-and-data-movement",
+        "secondary_capabilities": [
+          "cryptography-and-secrets",
+          "database-and-storage",
+          "testing-and-conformance",
+          "transport-and-networking"
+        ],
+        "responsibility": "Provide capability-oriented streaming filesystem contracts, backend-specific adapters, composable decorators, and conformance helpers.",
+        "non_goals": [
+          "Erase backend-specific consistency, atomicity, durability, permission, or retry semantics.",
+          "Select a universal storage backend or own application persistence policy."
+        ],
+        "public_package_identifier": "filesystem",
+        "primary_entry_packages": [
+          "github.com/faustbrian/go-filesystem"
+        ],
+        "package_selection": {
+          "github.com/faustbrian/go-filesystem": "Use for capability-oriented streaming filesystem contracts, logical paths, typed errors, and standard io/fs interoperability.",
+          "github.com/faustbrian/go-filesystem/decorator": "Use to add prefixes, read-only policy, checksums, safe retries, or instrumentation around an existing filesystem contract.",
+          "github.com/faustbrian/go-filesystem/fstest": "Use in tests for backend conformance, deterministic faults, and transport fault injection.",
+          "github.com/faustbrian/go-filesystem/ftp": "Use for bounded FTP access when its weaker protocol guarantees are explicitly acceptable.",
+          "github.com/faustbrian/go-filesystem/local": "Use for root-contained local filesystem storage with explicit symlink and publication behavior.",
+          "github.com/faustbrian/go-filesystem/memory": "Use for deterministic in-memory storage and tests without external I/O.",
+          "github.com/faustbrian/go-filesystem/r2": "Use for Cloudflare R2 through an explicitly configured S3-compatible client.",
+          "github.com/faustbrian/go-filesystem/s3": "Use for Amazon S3 or explicitly configured S3-compatible object storage.",
+          "github.com/faustbrian/go-filesystem/sftp": "Use for bounded SFTP access with explicit host verification and connection ownership."
+        },
+        "lifecycle_status": "active",
+        "maturity": "stable",
+        "construction_styles": [
+          "functional-options",
+          "must-helper",
+          "new-config",
+          "plain-function",
+          "validated-value"
+        ],
+        "lifecycle_styles": [
+          "close",
+          "stateless"
+        ],
+        "ownership": {
+          "configuration": "caller",
+          "mutable_inputs": [
+            "borrow",
+            "copy",
+            "transfer"
+          ],
+          "runtime_resources": "package",
+          "background_work": "package"
+        },
+        "optional_owned_dependencies": [],
+        "adapters": [
+          "github.com/faustbrian/go-filesystem/decorator",
+          "github.com/faustbrian/go-filesystem/ftp",
+          "github.com/faustbrian/go-filesystem/local",
+          "github.com/faustbrian/go-filesystem/memory",
+          "github.com/faustbrian/go-filesystem/r2",
+          "github.com/faustbrian/go-filesystem/s3",
+          "github.com/faustbrian/go-filesystem/sftp"
+        ],
+        "companions": [
+          "github.com/faustbrian/go-filesystem/fstest"
+        ],
+        "supported_go": {
+          "minimum": "1.26.6",
+          "tested": [
+            "1.26.6"
+          ]
+        },
+        "supported_platforms": [
+          "portable-go"
+        ],
+        "supported_backends": [
+          "amazon-s3",
+          "cloudflare-r2",
+          "ftp",
+          "local-filesystem",
+          "memory",
+          "s3-compatible",
+          "sftp"
+        ],
+        "supported_protocols": [
+          "ftp",
+          "s3",
+          "sftp"
+        ],
+        "documentation": {
+          "readme": "README.md",
+          "api": "docs/capabilities.md",
+          "adoption": "docs/adapters.md",
+          "security": "SECURITY.md",
+          "compatibility": "COMPATIBILITY.md",
+          "performance": "docs/operations.md",
+          "examples": "example_test.go",
+          "faq": "FAQ.md",
+          "changelog": "CHANGELOG.md",
+          "pkg_go_dev": "https://pkg.go.dev/github.com/faustbrian/go-filesystem",
+          "ecosystem_index": "https://github.com/faustbrian/go-library-tools/blob/v1.3.0/docs/ecosystem/README.md"
+        },
+        "known_good_compatibility_sets": [],
+        "delivery": {
+          "implementation": "not-started",
+          "hardening": "not-started",
+          "release": "not-started"
+        }
+      },
       "version": "1.0.0",
       "tag_prefix": "v",
       "owned_dependencies": [],

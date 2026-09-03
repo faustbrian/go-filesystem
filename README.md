@@ -15,6 +15,10 @@ Go. It supports local files, deterministic in-memory storage, Amazon S3,
 Cloudflare R2, SFTP, and FTP without claiming that those backends provide the
 same guarantees.
 
+For ecosystem-wide package selection and composition guidance, see the
+versioned [Golib ecosystem index](https://github.com/faustbrian/go-library-tools/blob/v1.3.0/docs/ecosystem/README.md)
+and [integration and data movement family guidance](https://github.com/faustbrian/go-library-tools/blob/v1.3.0/docs/ecosystem/design-language.md#package-families-and-selection).
+
 ```go
 store := memory.New()
 path := filesystem.MustParsePath("documents/report.txt")
@@ -78,12 +82,12 @@ See the [capability matrix](docs/capabilities.md),
 [adapter guide](docs/adapters.md), [decorator guide](docs/decorators.md),
 [operations guide](docs/operations.md), [verification matrix](docs/verification.md),
 and [security policy](SECURITY.md).
-The module requires Go 1.26 or newer.
+The module requires Go 1.26.6 or newer.
 
 ## Status
 
-The API is pre-1.0. Compatibility commitments and tested service versions are
-recorded in [COMPATIBILITY.md](COMPATIBILITY.md). Google Cloud Storage and
+The API is stable at v1. Compatibility commitments and tested service versions
+are recorded in [COMPATIBILITY.md](COMPATIBILITY.md). Google Cloud Storage and
 Azure Blob Storage are intentionally outside the initial release.
 
 ## License
