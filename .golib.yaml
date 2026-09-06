@@ -24,37 +24,37 @@ operations:
       - type: go-test
         packages: [.]
         fuzz: '^FuzzParsePath$'
-        budget: 10s
+        budget: 10000x
         timeout: 20m
       - type: go-test
         packages: [./local]
         fuzz: '^FuzzSymlinkContainment$'
-        budget: 10s
+        budget: 10000x
         timeout: 20m
       - type: go-test
         packages: [./memory]
         fuzz: '^FuzzMetadataAndListings$'
-        budget: 10s
+        budget: 10000x
         timeout: 20m
       - type: go-test
         packages: [./s3]
         fuzz: '^FuzzLogicalKeyTranslation$'
-        budget: 10s
+        budget: 10000x
         timeout: 20m
       - type: go-test
         packages: [./ftp]
         fuzz: '^FuzzMalformedListingEntry$'
-        budget: 10s
+        budget: 10000x
         timeout: 20m
       - type: go-test
         packages: [./sftp]
         fuzz: '^FuzzMalformedListingInfo$'
-        budget: 10s
+        budget: 10000x
         timeout: 20m
       - type: go-test
         packages: [./internal/redact]
         fuzz: '^FuzzErrorRedaction$'
-        budget: 10s
+        budget: 10000x
         timeout: 20m
   - module: .
     gate: benchmark
