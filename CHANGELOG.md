@@ -16,6 +16,12 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 - Deprecate the FTP, SFTP, and R2 `New` functions in favor of their explicit
   acquisition or load names; each remains an exact compatibility delegation.
 
+### Fixed
+
+- Run default fuzz smoke campaigns for a deterministic execution count so the
+  Go fuzz harness cannot report its own duration deadline as an application
+  failure.
+
 ### Security
 
 - Reject nil SFTP authentication methods and unsafe R2 option collaborators
