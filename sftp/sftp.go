@@ -16,6 +16,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -88,7 +89,20 @@ type Adapter struct {
 }
 
 // New validates SSH security settings and opens the initial SFTP session.
+//
+// Deprecated: use Open, which names the caller-owned session acquisition.
 func New(ctx context.Context, configuration Config) (*Adapter, error) {
+	return Open(ctx, configuration)
+}
+
+// Open validates SSH security settings and opens a caller-owned SFTP session.
+func Open(ctx context.Context, configuration Config) (*Adapter, error) {
+	if ctx == nil {
+		return nil, filesystem.ErrContextRequired
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(configuration.Address) == "" {
 		return nil, errors.New("sftp: address is required")
 	}
@@ -97,6 +111,11 @@ func New(ctx context.Context, configuration Config) (*Adapter, error) {
 	}
 	if len(configuration.Auth) == 0 {
 		return nil, errors.New("sftp: at least one authentication method is required")
+	}
+	for _, method := range configuration.Auth {
+		if isNilAuthMethod(method) {
+			return nil, errors.New("sftp: authentication methods must not be nil")
+		}
 	}
 	if configuration.HostKeyCallback == nil {
 		return nil, errors.New("sftp: host-key callback is required")
@@ -113,6 +132,9 @@ func New(ctx context.Context, configuration Config) (*Adapter, error) {
 	}
 	timeout := defaultTimeout(configuration.Timeout)
 	maxList := defaultMaxList(configuration.MaxListEntries)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	sshConfiguration := &ssh.ClientConfig{
 		User:            configuration.User,
@@ -125,23 +147,31 @@ func New(ctx context.Context, configuration Config) (*Adapter, error) {
 		if err != nil {
 			return nil, fmt.Errorf("sftp: dial SSH server: %w", err)
 		}
+		stopCancellation := context.AfterFunc(ctx, closeCallback(connection))
 		clientConnection, channels, requests, err := ssh.NewClientConn(connection, configuration.Address, sshConfiguration)
 		if err != nil {
+			stopCancellation()
 			_ = connection.Close()
-			return nil, fmt.Errorf("sftp: establish SSH connection: %w", err)
+			return nil, acquisitionError(ctx, "sftp: establish SSH connection", err)
 		}
 		sshClient := ssh.NewClient(clientConnection, channels, requests)
 		sftpClient, err := pkgsftp.NewClient(sshClient)
 		if err != nil {
+			stopCancellation()
 			_ = sshClient.Close()
-			return nil, fmt.Errorf("sftp: start subsystem: %w", err)
+			return nil, acquisitionError(ctx, "sftp: start subsystem", err)
 		}
-		return &realSession{sftp: sftpClient, ssh: sshClient}, nil
+		session := &realSession{sftp: sftpClient, ssh: sshClient}
+		stopCancellation()
+		return session, nil
 	}
 	return newAdapter(ctx, dial, root, maxList)
 }
 
 func newAdapter(ctx context.Context, dial connector, root string, maxList int) (*Adapter, error) {
+	if ctx == nil {
+		return nil, filesystem.ErrContextRequired
+	}
 	if dial == nil {
 		return nil, errors.New("sftp: connector is required")
 	}
@@ -152,8 +182,15 @@ func newAdapter(ctx context.Context, dial connector, root string, maxList int) (
 	if maxList <= 0 {
 		return nil, errors.New("sftp: maximum list entries must be positive")
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	session, err := dial(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		_ = session.Close()
 		return nil, err
 	}
 	_, atomicRename := session.HasExtension(posixRenameExtension)
@@ -180,6 +217,25 @@ func newAdapter(ctx context.Context, dial connector, root string, maxList int) (
 		capabilities: filesystem.NewCapabilitySet(capabilities...),
 		session:      session,
 	}, nil
+}
+
+func isNilAuthMethod(method ssh.AuthMethod) bool {
+	if method == nil {
+		return true
+	}
+	value := reflect.ValueOf(method)
+	return (value.Kind() == reflect.Func || value.Kind() == reflect.Pointer) && value.IsNil()
+}
+
+func acquisitionError(ctx context.Context, operation string, err error) error {
+	if contextErr := ctx.Err(); contextErr != nil {
+		return contextErr
+	}
+	return fmt.Errorf("%s: %w", operation, err)
+}
+
+func closeCallback(closer io.Closer) func() {
+	return func() { _ = closer.Close() }
 }
 
 // Close releases the current SFTP and SSH connections.

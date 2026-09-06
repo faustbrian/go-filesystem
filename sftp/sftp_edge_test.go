@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"net"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,51 @@ import (
 )
 
 var errInjected = errors.New("injected SFTP failure")
+
+func TestAuthMethodNilClassification(t *testing.T) {
+	if !isNilAuthMethod(nil) {
+		t.Fatal("isNilAuthMethod(nil) = false")
+	}
+	if !isNilAuthMethod(ssh.PasswordCallback(nil)) {
+		t.Fatal("isNilAuthMethod(typed nil callback) = false")
+	}
+	if isNilAuthMethod(ssh.Password("secret")) {
+		t.Fatal("isNilAuthMethod(non-nil callback) = true")
+	}
+	if isNilAuthMethod(ssh.RetryableAuthMethod(ssh.Password("secret"), 1)) {
+		t.Fatal("isNilAuthMethod(non-nil pointer) = true")
+	}
+	retryable := ssh.RetryableAuthMethod(ssh.Password("secret"), 1)
+	typedNilPointer := reflect.Zero(reflect.TypeOf(retryable)).Interface().(ssh.AuthMethod)
+	if !isNilAuthMethod(typedNilPointer) {
+		t.Fatal("isNilAuthMethod(typed nil pointer) = false")
+	}
+}
+
+func TestDefaultMaxListBoundary(t *testing.T) {
+	if got := defaultMaxList(0); got != 10_000 {
+		t.Fatalf("defaultMaxList(0) = %d", got)
+	}
+	if got := defaultMaxList(1); got != 1 {
+		t.Fatalf("defaultMaxList(1) = %d", got)
+	}
+}
+
+func TestAcquisitionHelpers(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := acquisitionError(ctx, "operation", errInjected); !errors.Is(err, context.Canceled) {
+		t.Fatalf("acquisitionError(canceled) = %v", err)
+	}
+	if err := acquisitionError(context.Background(), "operation", errInjected); !errors.Is(err, errInjected) {
+		t.Fatalf("acquisitionError(failure) = %v", err)
+	}
+	closer := &recordingCloser{}
+	closeCallback(closer)()
+	if !closer.closed {
+		t.Fatal("closeCallback() did not close resource")
+	}
+}
 
 func TestConfigurationAndInternalConstructorValidation(t *testing.T) {
 	base := Config{
@@ -59,8 +105,145 @@ func TestConfigurationAndInternalConstructorValidation(t *testing.T) {
 	if _, err := newAdapter(context.Background(), connector, "/", 1); !errors.Is(err, errInjected) {
 		t.Fatalf("newAdapter(connect) error = %v", err)
 	}
+	var nilContext context.Context
+	if _, err := newAdapter(nilContext, connector, "/", 1); !errors.Is(err, filesystem.ErrContextRequired) {
+		t.Fatalf("newAdapter(nil context) error = %v", err)
+	}
+	preCanceled, preCancel := context.WithCancel(context.Background())
+	preCancel()
+	if _, err := newAdapter(preCanceled, connector, "/", 1); !errors.Is(err, context.Canceled) {
+		t.Fatalf("newAdapter(pre-canceled) error = %v", err)
+	}
+	canceled, cancel := context.WithCancel(context.Background())
+	session := &fakeSession{state: newFakeState()}
+	if _, err := newAdapter(canceled, func(context.Context) (remoteSession, error) {
+		cancel()
+		return session, nil
+	}, "/", 1); !errors.Is(err, context.Canceled) {
+		t.Fatalf("newAdapter(canceled after dial) error = %v", err)
+	}
+	if !session.closed {
+		t.Fatal("newAdapter(canceled after dial) left session open")
+	}
 	if connectorCalls != 1 {
 		t.Fatalf("newAdapter(valid maximum) connector calls = %d, want 1", connectorCalls)
+	}
+}
+
+func TestAcquisitionRejectsNilInputsBeforeDial(t *testing.T) {
+	var nilContext context.Context
+	if _, err := Open(nilContext, Config{}); !errors.Is(err, filesystem.ErrContextRequired) {
+		t.Fatalf("Open(nil) error = %v", err)
+	}
+	if _, err := New(nilContext, Config{}); !errors.Is(err, filesystem.ErrContextRequired) {
+		t.Fatalf("New(nil) error = %v", err)
+	}
+	preCanceled, preCancel := context.WithCancel(context.Background())
+	preCancel()
+	if _, err := Open(preCanceled, Config{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Open(canceled, invalid config) error = %v", err)
+	}
+	if _, err := New(preCanceled, Config{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("New(canceled, invalid config) error = %v", err)
+	}
+	validationCanceled := &stagedCancellationContext{}
+	if _, err := Open(validationCanceled, Config{
+		Address: "unused:22", User: "user", Auth: []ssh.AuthMethod{ssh.Password("secret")},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Open(canceled after validation) error = %v", err)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	base := Config{
+		Address: listener.Addr().String(), User: "user",
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	for name, auth := range map[string][]ssh.AuthMethod{
+		"nil":         {nil},
+		"typed nil":   {ssh.PasswordCallback(nil)},
+		"mixed nil":   {ssh.Password("secret"), nil},
+		"mixed typed": {ssh.Password("secret"), ssh.PasswordCallback(nil)},
+	} {
+		configuration := base
+		configuration.Auth = auth
+		if _, err := Open(context.Background(), configuration); err == nil {
+			t.Fatalf("Open(%s auth) error = nil", name)
+		}
+	}
+	configuration := base
+	configuration.Auth = []ssh.AuthMethod{ssh.Password("secret")}
+	configuration.HostKeyCallback = nil
+	if _, err := Open(context.Background(), configuration); err == nil {
+		t.Fatal("Open(nil host-key callback) error = nil")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	configuration.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+	_, err = Open(ctx, configuration)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Open(pre-canceled) error = %v", err)
+	}
+	if err := listener.(*net.TCPListener).SetDeadline(time.Now().Add(25 * time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
+	if connection, acceptErr := listener.Accept(); acceptErr == nil {
+		_ = connection.Close()
+		t.Fatal("Open(invalid or pre-canceled) dialed the server")
+	}
+}
+
+func TestAcquisitionCancellationClosesHandshakeConnection(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	accepted := make(chan net.Conn, 1)
+	go func() {
+		connection, acceptErr := listener.Accept()
+		if acceptErr == nil {
+			accepted <- connection
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() {
+		_, openErr := Open(ctx, Config{
+			Address: listener.Addr().String(), User: "user",
+			Auth:            []ssh.AuthMethod{ssh.Password("secret")},
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		})
+		result <- openErr
+	}()
+	connection := <-accepted
+	defer func() { _ = connection.Close() }()
+	cancel()
+	select {
+	case openErr := <-result:
+		if !errors.Is(openErr, context.Canceled) {
+			t.Fatalf("Open(canceled handshake) error = %v", openErr)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Open(canceled handshake) did not return")
+	}
+	buffer := make([]byte, 256)
+	if err := connection.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := connection.Read(buffer); err != nil {
+			if !errors.Is(err, io.EOF) {
+				t.Fatalf("server connection read error = %v, want EOF", err)
+			}
+			break
+		}
 	}
 }
 
@@ -480,6 +663,26 @@ func testAdapter(t *testing.T, session remoteSession) *Adapter {
 }
 
 type cancelAtEOFReader struct{ cancel context.CancelFunc }
+
+type stagedCancellationContext struct{ checks int }
+
+func (*stagedCancellationContext) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (*stagedCancellationContext) Done() <-chan struct{}       { return nil }
+func (ctx *stagedCancellationContext) Err() error {
+	ctx.checks++
+	if ctx.checks > 1 {
+		return context.Canceled
+	}
+	return nil
+}
+func (*stagedCancellationContext) Value(any) any { return nil }
+
+type recordingCloser struct{ closed bool }
+
+func (closer *recordingCloser) Close() error {
+	closer.closed = true
+	return errInjected
+}
 
 func (r cancelAtEOFReader) Read([]byte) (int, error) {
 	r.cancel()

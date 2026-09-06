@@ -17,6 +17,15 @@ import (
 
 var errInjected = errors.New("injected FTP failure")
 
+func TestCurrentSessionPropagatesConnectorFailure(t *testing.T) {
+	adapter := &Adapter{connector: func(context.Context) (remoteSession, error) {
+		return nil, errInjected
+	}}
+	if _, err := adapter.currentSession(context.Background()); !errors.Is(err, errInjected) {
+		t.Fatalf("currentSession() error = %v", err)
+	}
+}
+
 func TestConstructorOptionAndInternalValidation(t *testing.T) {
 	t.Parallel()
 
@@ -26,6 +35,7 @@ func TestConstructorOptionAndInternalValidation(t *testing.T) {
 		Password:  "secret",
 		TLSMode:   TLSExplicit,
 		TLSConfig: &tls.Config{ServerName: "example.test", MinVersion: tls.VersionTLS11},
+		Timeout:   time.Millisecond,
 	}); err == nil {
 		t.Fatal("New(old TLS) error = nil")
 	}
@@ -35,6 +45,7 @@ func TestConstructorOptionAndInternalValidation(t *testing.T) {
 		Password:  "secret",
 		TLSMode:   TLSExplicit,
 		TLSConfig: &tls.Config{},
+		Timeout:   time.Millisecond,
 	}); err == nil {
 		t.Fatal("New(missing port) error = nil")
 	}
@@ -64,12 +75,93 @@ func TestConstructorOptionAndInternalValidation(t *testing.T) {
 	if _, err := newAdapter(context.Background(), connector, "/", 1, Profile{}); !errors.Is(err, errInjected) {
 		t.Fatalf("newAdapter(connect) error = %v", err)
 	}
-	session := &fakeSession{state: newFakeState(), machineListings: true}
+	var nilContext context.Context
+	if _, err := newAdapter(nilContext, connector, "/", 1, Profile{}); !errors.Is(err, filesystem.ErrContextRequired) {
+		t.Fatalf("newAdapter(nil context) error = %v", err)
+	}
+	preCanceled, preCancel := context.WithCancel(context.Background())
+	preCancel()
+	if _, err := newAdapter(preCanceled, connector, "/", 1, Profile{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("newAdapter(pre-canceled) error = %v", err)
+	}
+	canceled, cancel := context.WithCancel(context.Background())
+	session := &fakeSession{state: newFakeState()}
+	if _, err := newAdapter(canceled, func(context.Context) (remoteSession, error) {
+		cancel()
+		return session, nil
+	}, "/", 1, Profile{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("newAdapter(canceled after dial) error = %v", err)
+	}
+	if session.quitCalls != 1 {
+		t.Fatalf("newAdapter(canceled after dial) quits = %d, want 1", session.quitCalls)
+	}
+	session = &fakeSession{state: newFakeState(), machineListings: true}
 	adapter := testFTPAdapter(t, session)
 	if !adapter.Profile().MachineListings {
 		t.Fatal("newAdapter did not merge machine-listing support")
 	}
 }
+
+func TestAcquisitionContextPrecedesValidationAndDial(t *testing.T) {
+	var nilContext context.Context
+	if _, err := Open(nilContext, Config{}); !errors.Is(err, filesystem.ErrContextRequired) {
+		t.Fatalf("Open(nil) error = %v", err)
+	}
+	if _, err := New(nilContext, Config{}); !errors.Is(err, filesystem.ErrContextRequired) {
+		t.Fatalf("New(nil) error = %v", err)
+	}
+	preCanceled, preCancel := context.WithCancel(context.Background())
+	preCancel()
+	if _, err := Open(preCanceled, Config{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Open(canceled, invalid config) error = %v", err)
+	}
+	if _, err := New(preCanceled, Config{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("New(canceled, invalid config) error = %v", err)
+	}
+	validationCanceled := &stagedCancellationContext{}
+	if _, err := Open(validationCanceled, Config{
+		Address: "unused:21", Username: "user", Password: "secret",
+		TLSMode: TLSPlaintext, AllowPlaintext: true,
+	}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Open(canceled after validation) error = %v", err)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = Open(ctx, Config{
+		Address: listener.Addr().String(), Username: "user", Password: "secret",
+		TLSMode: TLSPlaintext, AllowPlaintext: true,
+		DisableEPSV: true,
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Open(pre-canceled) error = %v", err)
+	}
+	if err := listener.(*net.TCPListener).SetDeadline(time.Now().Add(25 * time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
+	if connection, acceptErr := listener.Accept(); acceptErr == nil {
+		_ = connection.Close()
+		t.Fatal("Open(pre-canceled) dialed the server")
+	}
+}
+
+type stagedCancellationContext struct{ checks int }
+
+func (*stagedCancellationContext) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (*stagedCancellationContext) Done() <-chan struct{}       { return nil }
+func (ctx *stagedCancellationContext) Err() error {
+	ctx.checks++
+	if ctx.checks > 1 {
+		return context.Canceled
+	}
+	return nil
+}
+func (*stagedCancellationContext) Value(any) any { return nil }
 
 func TestConfigurationBoundaryNormalization(t *testing.T) {
 	t.Parallel()

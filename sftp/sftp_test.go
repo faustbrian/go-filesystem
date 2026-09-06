@@ -19,6 +19,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+var _ func(context.Context, Config) (*Adapter, error) = Open
+
 func TestConformance(t *testing.T) {
 	fstest.TestFilesystem(t, func(t *testing.T) fstest.Filesystem {
 		t.Helper()

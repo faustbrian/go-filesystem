@@ -1,6 +1,7 @@
 package r2
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,7 +12,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	filesystem "github.com/faustbrian/go-filesystem"
+	filesystemS3 "github.com/faustbrian/go-filesystem/s3"
 )
+
+var errInjected = errors.New("injected R2 failure")
 
 var validConfig = Config{
 	AccountID:       "0123456789abcdef0123456789abcdef",
@@ -164,8 +170,193 @@ func TestConfigurationLoaderFailureIsWrapped(t *testing.T) {
 	}
 }
 
+func TestTransportConstructionFailureIsPreserved(t *testing.T) {
+	loads := 0
+	_, err := newWithLoaderAndTransport(
+		context.Background(),
+		validConfig,
+		func(context.Context, ...func(*awsconfig.LoadOptions) error) (aws.Config, error) {
+			loads++
+			return aws.Config{}, nil
+		},
+		func(*awss3.Client, string, ...filesystemS3.Option) (*filesystemS3.Adapter, error) {
+			return nil, errInjected
+		},
+	)
+	if !errors.Is(err, errInjected) || loads != 1 {
+		t.Fatalf("newWithLoaderAndTransport() error = %v, loads = %d", err, loads)
+	}
+}
+
+func TestLoadAppliesConfiguredPrefixToTransportRequests(t *testing.T) {
+	httpClient := &recordingHTTPClient{}
+	configuration := validConfig
+	configuration.Prefix = "tenant/files"
+	adapter, err := Load(context.Background(), configuration, WithHTTPClient(httpClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	logicalPath, err := filesystem.ParsePath("object.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Write(context.Background(), logicalPath, bytes.NewReader([]byte("contents")), filesystem.WriteOptions{}); err == nil {
+		t.Fatal("Write() error = nil")
+	}
+	if httpClient.path != "/bucket/tenant/files/object.txt" {
+		t.Fatalf("request path = %q", httpClient.path)
+	}
+}
+
+func TestLoadRejectsInvalidInputsBeforeConfigurationLoad(t *testing.T) {
+	var nilContext context.Context
+	optionCalls := 0
+	option := func(*settings) { optionCalls++ }
+	if _, err := Load(nilContext, Config{}, option); !errors.Is(err, filesystem.ErrContextRequired) {
+		t.Fatalf("Load(nil) error = %v", err)
+	}
+	if _, err := New(nilContext, Config{}, option); !errors.Is(err, filesystem.ErrContextRequired) {
+		t.Fatalf("New(nil) error = %v", err)
+	}
+	if optionCalls != 0 {
+		t.Fatalf("nil-context load invoked options %d times", optionCalls)
+	}
+	preCanceled, preCancel := context.WithCancel(context.Background())
+	preCancel()
+	if _, err := Load(preCanceled, Config{}, option); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Load(canceled, invalid config) error = %v", err)
+	}
+	if _, err := New(preCanceled, Config{}, option); !errors.Is(err, context.Canceled) {
+		t.Fatalf("New(canceled, invalid config) error = %v", err)
+	}
+	if optionCalls != 0 {
+		t.Fatalf("pre-canceled load invoked options %d times", optionCalls)
+	}
+
+	var typedNilClient *stubHTTPClient
+	for name, options := range map[string][]Option{
+		"nil option":              {nil},
+		"mixed nil option":        {WithMaxListEntries(1), nil},
+		"nil transfer callback":   {WithTransferOptions(nil)},
+		"mixed transfer callback": {WithTransferOptions(func(*transfermanager.Options) {}, nil)},
+		"literal nil HTTP client": {WithHTTPClient(nil)},
+		"typed-nil HTTP client":   {WithHTTPClient(typedNilClient)},
+	} {
+		loads := 0
+		_, err := newWithLoader(context.Background(), validConfig, func(context.Context, ...func(*awsconfig.LoadOptions) error) (aws.Config, error) {
+			loads++
+			return aws.Config{}, nil
+		}, options...)
+		if err == nil {
+			t.Fatalf("newWithLoader(%s) error = nil", name)
+		}
+		if loads != 0 {
+			t.Fatalf("newWithLoader(%s) loads = %d, want 0", name, loads)
+		}
+	}
+
+	configuration := validConfig
+	configuration.Prefix = "../escape"
+	loads := 0
+	if _, err := newWithLoader(context.Background(), configuration, func(context.Context, ...func(*awsconfig.LoadOptions) error) (aws.Config, error) {
+		loads++
+		return aws.Config{}, nil
+	}); err == nil {
+		t.Fatal("newWithLoader(invalid prefix) error = nil")
+	}
+	if loads != 0 {
+		t.Fatalf("newWithLoader(invalid prefix) loads = %d, want 0", loads)
+	}
+	if isNilHTTPClient(valueHTTPClient{}) {
+		t.Fatal("isNilHTTPClient(value) = true")
+	}
+}
+
+func TestLoadHonorsCancellationAndLoadsOnce(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	loads := 0
+	loader := func(ctx context.Context, _ ...func(*awsconfig.LoadOptions) error) (aws.Config, error) {
+		loads++
+		return aws.Config{}, ctx.Err()
+	}
+	if _, err := newWithLoader(ctx, validConfig, loader); !errors.Is(err, context.Canceled) {
+		t.Fatalf("newWithLoader(pre-canceled) error = %v", err)
+	}
+	if loads != 0 {
+		t.Fatalf("newWithLoader(pre-canceled) loads = %d, want 0", loads)
+	}
+
+	ctx, cancel = context.WithCancel(context.Background())
+	loads = 0
+	_, err := newWithLoader(ctx, validConfig, func(context.Context, ...func(*awsconfig.LoadOptions) error) (aws.Config, error) {
+		loads++
+		return aws.Config{}, nil
+	}, func(*settings) { cancel() })
+	if !errors.Is(err, context.Canceled) || loads != 0 {
+		t.Fatalf("newWithLoader(canceled by option) error = %v, loads = %d", err, loads)
+	}
+
+	loads = 0
+	_, err = newWithLoader(context.Background(), validConfig, func(context.Context, ...func(*awsconfig.LoadOptions) error) (aws.Config, error) {
+		loads++
+		return aws.Config{}, errors.New("load failed")
+	})
+	if err == nil || loads != 1 {
+		t.Fatalf("newWithLoader() error = %v, loads = %d", err, loads)
+	}
+
+	ctx, cancel = context.WithCancel(context.Background())
+	loads = 0
+	_, err = newWithLoader(ctx, validConfig, func(ctx context.Context, _ ...func(*awsconfig.LoadOptions) error) (aws.Config, error) {
+		loads++
+		cancel()
+		return aws.Config{}, ctx.Err()
+	})
+	if !errors.Is(err, context.Canceled) || loads != 1 {
+		t.Fatalf("newWithLoader(canceled during load) error = %v, loads = %d", err, loads)
+	}
+
+	ctx, cancel = context.WithCancel(context.Background())
+	loads = 0
+	_, err = newWithLoader(ctx, validConfig, func(context.Context, ...func(*awsconfig.LoadOptions) error) (aws.Config, error) {
+		loads++
+		cancel()
+		return aws.Config{}, nil
+	})
+	if !errors.Is(err, context.Canceled) || loads != 1 {
+		t.Fatalf("newWithLoader(canceled after load) error = %v, loads = %d", err, loads)
+	}
+}
+
+func TestTransferOptionsAreDefensivelyCopied(t *testing.T) {
+	first := func(*transfermanager.Options) {}
+	callbacks := []func(*transfermanager.Options){first}
+	configuration := settings{}
+	WithTransferOptions(callbacks...)(&configuration)
+	callbacks[0] = nil
+	if len(configuration.transferOptions) != 1 || configuration.transferOptions[0] == nil {
+		t.Fatal("WithTransferOptions retained the caller slice")
+	}
+}
+
 type stubHTTPClient struct{}
 
 func (*stubHTTPClient) Do(*http.Request) (*http.Response, error) {
+	return nil, errors.New("unexpected HTTP request")
+}
+
+type recordingHTTPClient struct {
+	path string
+}
+
+func (client *recordingHTTPClient) Do(request *http.Request) (*http.Response, error) {
+	client.path = request.URL.Path
+	return nil, errInjected
+}
+
+type valueHTTPClient struct{}
+
+func (valueHTTPClient) Do(*http.Request) (*http.Response, error) {
 	return nil, errors.New("unexpected HTTP request")
 }

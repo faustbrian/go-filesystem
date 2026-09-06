@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -65,12 +66,15 @@ type settings struct {
 	maxMetadataBytes    int64
 	transferOptions     []func(*transfermanager.Options)
 	httpClient          aws.HTTPClient
+	httpClientSet       bool
 }
 
 type configurationLoader func(
 	context.Context,
 	...func(*awsconfig.LoadOptions) error,
 ) (aws.Config, error)
+
+type transportConstructor func(*awss3.Client, string, ...filesystemS3.Option) (*filesystemS3.Adapter, error)
 
 // WithEndpoint overrides the account endpoint with an HTTPS S3-compatible
 // endpoint. The URL may not contain credentials, a path, query, or fragment.
@@ -119,6 +123,7 @@ func WithTransferOptions(options ...func(*transfermanager.Options)) Option {
 func WithHTTPClient(client aws.HTTPClient) Option {
 	return func(configuration *settings) {
 		configuration.httpClient = client
+		configuration.httpClientSet = true
 	}
 }
 
@@ -131,7 +136,15 @@ type Adapter struct {
 
 // New creates an R2 adapter using explicit credentials and the required auto
 // signing region.
+//
+// Deprecated: use Load, which names the external AWS configuration load.
 func New(ctx context.Context, configuration Config, options ...Option) (*Adapter, error) {
+	return Load(ctx, configuration, options...)
+}
+
+// Load loads AWS configuration and creates an R2 adapter using explicit
+// credentials and the required auto signing region.
+func Load(ctx context.Context, configuration Config, options ...Option) (*Adapter, error) {
 	return newWithLoader(ctx, configuration, awsconfig.LoadDefaultConfig, options...)
 }
 
@@ -141,6 +154,22 @@ func newWithLoader(
 	loader configurationLoader,
 	options ...Option,
 ) (*Adapter, error) {
+	return newWithLoaderAndTransport(ctx, configuration, loader, filesystemS3.NewR2Transport, options...)
+}
+
+func newWithLoaderAndTransport(
+	ctx context.Context,
+	configuration Config,
+	loader configurationLoader,
+	newTransport transportConstructor,
+	options ...Option,
+) (*Adapter, error) {
+	if ctx == nil {
+		return nil, filesystem.ErrContextRequired
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if !accountIDPattern.MatchString(configuration.AccountID) {
 		return nil, errors.New("r2: account ID must be 32 hexadecimal characters")
 	}
@@ -160,7 +189,18 @@ func newWithLoader(
 		maxMetadataBytes:   64 * 1024,
 	}
 	for _, option := range options {
+		if option == nil {
+			return nil, errors.New("r2: option must not be nil")
+		}
 		option(&configurationOptions)
+	}
+	for _, option := range configurationOptions.transferOptions {
+		if option == nil {
+			return nil, errors.New("r2: transfer option must not be nil")
+		}
+	}
+	if configurationOptions.httpClientSet && isNilHTTPClient(configurationOptions.httpClient) {
+		return nil, errors.New("r2: HTTP client must not be nil")
 	}
 	endpoint := configurationOptions.endpoint
 	if endpoint == "" {
@@ -171,6 +211,14 @@ func newWithLoader(
 		return nil, err
 	}
 	if err := validateLimits(configurationOptions); err != nil {
+		return nil, err
+	}
+	if configuration.Prefix != "" {
+		if _, err := filesystem.ParsePath(configuration.Prefix); err != nil {
+			return nil, fmt.Errorf("s3: invalid prefix: %w", err)
+		}
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
@@ -192,6 +240,9 @@ func newWithLoader(
 			redact.Error(err, configuration.AccessKeyID, configuration.SecretAccessKey),
 		)
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	client := awss3.NewFromConfig(awsConfiguration, func(options *awss3.Options) {
 		options.BaseEndpoint = aws.String(endpoint)
 		options.UsePathStyle = true
@@ -207,7 +258,7 @@ func newWithLoader(
 		transportOptions = append(transportOptions, filesystemS3.WithPrefix(configuration.Prefix))
 	}
 	transportOptions = append(transportOptions, filesystemS3.WithTransferOptions(configurationOptions.transferOptions...))
-	transport, err := filesystemS3.NewR2Transport(client, configuration.Bucket, transportOptions...)
+	transport, err := newTransport(client, configuration.Bucket, transportOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -223,6 +274,19 @@ func newWithLoader(
 			MultipartRequiresUniformPartSize: true,
 		},
 	}, nil
+}
+
+func isNilHTTPClient(client aws.HTTPClient) bool {
+	if client == nil {
+		return true
+	}
+	value := reflect.ValueOf(client)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }
 
 func validateLimits(configuration settings) error {

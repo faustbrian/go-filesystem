@@ -20,6 +20,8 @@ import (
 	protocolserver "github.com/gonzalop/ftp/server"
 )
 
+var _ func(context.Context, Config) (*Adapter, error) = Open
+
 func TestConcreteClientIntegration(t *testing.T) {
 	root := t.TempDir()
 	driver, err := protocolserver.NewFSDriver(root,
@@ -54,12 +56,13 @@ func TestConcreteClientIntegration(t *testing.T) {
 		}
 	})
 
-	adapter, err := New(context.Background(), Config{
+	adapter, err := Open(context.Background(), Config{
 		Address:        listener.Addr().String(),
 		Username:       "user",
 		Password:       "password",
 		TLSMode:        TLSPlaintext,
 		AllowPlaintext: true,
+		DisableEPSV:    true,
 		Timeout:        30 * time.Second,
 	})
 	if err != nil {
@@ -511,6 +514,7 @@ type fakeSession struct {
 	renameError     error
 	abortError      error
 	quitError       error
+	quitCalls       int
 	machineListings bool
 	listEntries     []remoteEntry
 	statEntry       *remoteEntry
@@ -646,7 +650,10 @@ func (s *fakeSession) Abort() error {
 	return s.abortError
 }
 
-func (s *fakeSession) Quit() error { return s.quitError }
+func (s *fakeSession) Quit() error {
+	s.quitCalls++
+	return s.quitError
+}
 
 func (s *fakeSession) MachineListings() bool { return s.machineListings }
 
