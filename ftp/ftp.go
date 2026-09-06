@@ -126,7 +126,20 @@ type Adapter struct {
 }
 
 // New validates security settings and establishes the initial FTP session.
+//
+// Deprecated: use Open, which names the caller-owned session acquisition.
 func New(ctx context.Context, configuration Config) (*Adapter, error) {
+	return Open(ctx, configuration)
+}
+
+// Open validates security settings and establishes a caller-owned FTP session.
+func Open(ctx context.Context, configuration Config) (*Adapter, error) {
+	if ctx == nil {
+		return nil, filesystem.ErrContextRequired
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(configuration.Address) == "" {
 		return nil, errors.New("ftp: address is required")
 	}
@@ -169,6 +182,9 @@ func New(ctx context.Context, configuration Config) (*Adapter, error) {
 	}
 	timeout := defaultTimeout(configuration.Timeout)
 	maxList := defaultMaxList(configuration.MaxListEntries)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	options := []protocol.Option{protocol.WithTimeout(timeout)}
 	dataModeOptions := [2][]protocol.Option{nil, {protocol.WithActiveMode()}}
@@ -186,6 +202,9 @@ func New(ctx context.Context, configuration Config) (*Adapter, error) {
 }
 
 func newAdapter(ctx context.Context, dial connector, root string, maxList int, profile Profile) (*Adapter, error) {
+	if ctx == nil {
+		return nil, filesystem.ErrContextRequired
+	}
 	if dial == nil {
 		return nil, errors.New("ftp: connector is required")
 	}
@@ -196,8 +215,15 @@ func newAdapter(ctx context.Context, dial connector, root string, maxList int, p
 	if maxList <= 0 {
 		return nil, errors.New("ftp: maximum list entries must be positive")
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	session, err := dial(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		_ = session.Quit()
 		return nil, err
 	}
 	profile.MachineListings = profile.MachineListings || session.MachineListings()

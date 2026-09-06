@@ -6,6 +6,9 @@ import (
 )
 
 var (
+	// ErrContextRequired means an acquisition or load operation received a nil
+	// context and therefore could not establish a cancellation boundary.
+	ErrContextRequired = errors.New("filesystem: context required")
 	// ErrUnsupportedCapability means an adapter cannot safely provide an
 	// operation with its documented semantics.
 	ErrUnsupportedCapability = errors.New("unsupported filesystem capability")

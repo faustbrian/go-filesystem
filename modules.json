@@ -170,19 +170,21 @@
           "github.com/faustbrian/go-filesystem": "Use for capability-oriented streaming filesystem contracts, logical paths, typed errors, and standard io/fs interoperability.",
           "github.com/faustbrian/go-filesystem/decorator": "Use to add prefixes, read-only policy, checksums, safe retries, or instrumentation around an existing filesystem contract.",
           "github.com/faustbrian/go-filesystem/fstest": "Use in tests for backend conformance, deterministic faults, and transport fault injection.",
-          "github.com/faustbrian/go-filesystem/ftp": "Use for bounded FTP access when its weaker protocol guarantees are explicitly acceptable.",
+          "github.com/faustbrian/go-filesystem/ftp": "Use Open for bounded FTP access when its weaker protocol guarantees are explicitly acceptable.",
           "github.com/faustbrian/go-filesystem/local": "Use for root-contained local filesystem storage with explicit symlink and publication behavior.",
           "github.com/faustbrian/go-filesystem/memory": "Use for deterministic in-memory storage and tests without external I/O.",
-          "github.com/faustbrian/go-filesystem/r2": "Use for Cloudflare R2 through an explicitly configured S3-compatible client.",
+          "github.com/faustbrian/go-filesystem/r2": "Use Load for Cloudflare R2 configuration through an explicitly configured S3-compatible client.",
           "github.com/faustbrian/go-filesystem/s3": "Use for Amazon S3 or explicitly configured S3-compatible object storage.",
-          "github.com/faustbrian/go-filesystem/sftp": "Use for bounded SFTP access with explicit host verification and connection ownership."
+          "github.com/faustbrian/go-filesystem/sftp": "Use Open for bounded SFTP access with explicit host verification and connection ownership."
         },
         "lifecycle_status": "active",
         "maturity": "stable",
         "construction_styles": [
           "functional-options",
+          "load",
           "must-helper",
           "new-config",
+          "open",
           "plain-function",
           "validated-value"
         ],

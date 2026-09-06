@@ -5,7 +5,21 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Add `ftp.Open` and `sftp.Open` for caller-owned session acquisition and
+  `r2.Load` for AWS configuration loading, with a shared
+  `filesystem.ErrContextRequired` nil-context classification.
+
+### Deprecated
+
+- Deprecate the FTP, SFTP, and R2 `New` functions in favor of their explicit
+  acquisition or load names; each remains an exact compatibility delegation.
+
 ### Security
+
+- Reject nil SFTP authentication methods and unsafe R2 option collaborators
+  before external I/O, and close partial SFTP acquisitions on cancellation.
 
 - Update `golang.org/x/crypto` to v0.56.0 so SFTP SSH channel handling includes
   the fixes for GO-2026-6354 and GO-2026-6355 denial-of-service conditions.

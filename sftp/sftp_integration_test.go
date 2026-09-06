@@ -22,7 +22,7 @@ func TestRealSFTPServerConformance(t *testing.T) {
 	fstest.TestFilesystem(t, func(t *testing.T) fstest.Filesystem {
 		t.Helper()
 		root := filepath.Join(t.TempDir(), "storage")
-		adapter, err := New(context.Background(), Config{
+		adapter, err := Open(context.Background(), Config{
 			Address:         server.address,
 			User:            "test",
 			Auth:            []ssh.AuthMethod{ssh.Password("secret")},

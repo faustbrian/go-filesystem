@@ -54,11 +54,12 @@ store, err := filesystemS3.New(
 
 ## Cloudflare R2
 
-Use `r2.New` with the 32-character account ID, bucket, and scoped R2 API
+Use `r2.Load` with the 32-character account ID, bucket, and scoped R2 API
 credentials. The adapter derives and validates the HTTPS account endpoint and
 uses SigV4 region `auto`. A custom endpoint is rejected if it contains user
 information, paths, queries, or fragments. Development HTTP endpoints require
-the explicit development option.
+the explicit development option. `Load` accepts a context because it loads the
+AWS configuration and credentials; it does not open an R2 protocol session.
 
 R2 is a separate profile, not an alias for S3. Consult `Adapter.Profile()` for
 endpoint, path-style, ACL, copy-checksum, and multipart differences.
@@ -66,7 +67,7 @@ endpoint, path-style, ACL, copy-checksum, and multipart differences.
 as the S3 transport.
 
 ```go
-store, err := r2.New(ctx, r2.Config{
+store, err := r2.Load(ctx, r2.Config{
     AccountID:       os.Getenv("R2_ACCOUNT_ID"),
     Bucket:          "application-files",
     AccessKeyID:     os.Getenv("R2_ACCESS_KEY_ID"),
@@ -91,7 +92,7 @@ hostKeys, err := knownhosts.New("/etc/application/ssh_known_hosts")
 if err != nil {
     return err
 }
-store, err := sftp.New(ctx, sftp.Config{
+store, err := sftp.Open(ctx, sftp.Config{
     Address:         "files.example.com:22",
     User:            "application",
     Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
@@ -117,7 +118,7 @@ writes are never replayed. Cross-platform copy, move, ranges, metadata,
 checksums, URLs, and visibility are not advertised.
 
 ```go
-store, err := ftp.New(ctx, ftp.Config{
+store, err := ftp.Open(ctx, ftp.Config{
     Address:  "files.example.com:21",
     Username: os.Getenv("FTP_USERNAME"),
     Password: os.Getenv("FTP_PASSWORD"),
@@ -127,6 +128,10 @@ store, err := ftp.New(ctx, ftp.Config{
 })
 ```
 
-Each constructor returns an error before use when required security or bounds
-are missing. S3, R2, SFTP, FTP, and local adapters own resources and should be
-closed where their type exposes `Close`.
+Each acquisition or load returns an error before external I/O when required
+security settings or bounds are invalid. A nil context returns
+`filesystem.ErrContextRequired`, and a pre-canceled context performs no dial or
+configuration load. FTP and SFTP adapters own their sessions; callers must use
+their immediate, idempotent `Close` methods. An HTTP client supplied to R2 is
+borrowed and remains caller-owned. The deprecated `ftp.New`, `sftp.New`, and
+`r2.New` functions delegate to these replacements for source compatibility.

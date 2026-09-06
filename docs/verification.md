@@ -16,7 +16,7 @@ implementation is supplied by the pinned tool.
 | Memory | `memory.TestConformance` | In-process store | cancellation, metadata copying, concurrent streams |
 | Local | `local.TestConformance` | `os.Root` and host filesystem | symlink-swap containment, permissions, atomic rename cleanup, concurrent readers/writers |
 | S3 | `s3.TestConformance` | pinned MinIO | pagination, conditional writes, metadata limits, temporary URLs, multipart abort |
-| R2 | shared S3 transport suite | pinned MinIO through `r2.New` | `auto` region, endpoint validation, R2 profile, multipart abort |
+| R2 | shared S3 transport suite | pinned MinIO through `r2.Load` | `auto` region, endpoint validation, R2 profile, multipart abort |
 | SFTP | `sftp.TestConformance` | in-process SSH and SFTP server | host keys, authentication, reconnect, POSIX rename negotiation |
 | FTP | `ftp.TestConformance` | in-process FTP server | passive/active plaintext transfers, reconnect, legacy listings |
 

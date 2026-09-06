@@ -9,10 +9,12 @@ import (
 	filesystem "github.com/faustbrian/go-filesystem"
 )
 
-func TestNewBuildsCloudflareProfile(t *testing.T) {
+var _ func(context.Context, Config, ...Option) (*Adapter, error) = Load
+
+func TestLoadBuildsCloudflareProfile(t *testing.T) {
 	t.Parallel()
 
-	adapter, err := New(context.Background(), Config{
+	adapter, err := Load(context.Background(), Config{
 		AccountID:       "0123456789abcdef0123456789abcdef",
 		Bucket:          "bucket",
 		AccessKeyID:     "access-key",
