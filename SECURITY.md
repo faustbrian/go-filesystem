@@ -3,9 +3,8 @@
 ## Reporting
 
 Do not open a public issue for a suspected vulnerability. Send a private
-report to the repository owner with the affected version, reproduction, and
-impact. Until a dedicated address is published, use GitHub private
-vulnerability reporting when enabled.
+report through [GitHub private vulnerability reporting](https://github.com/faustbrian/go-filesystem/security/advisories/new)
+with the affected version, reproduction, and impact.
 
 ## Security model
 

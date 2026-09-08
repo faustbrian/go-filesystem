@@ -43,7 +43,8 @@ type Config struct {
 	HostKeyCallback ssh.HostKeyCallback
 	// Root is the absolute remote directory containing all logical paths.
 	Root string
-	// Timeout bounds dialing and SSH setup; zero selects 30 seconds.
+	// Timeout bounds TCP dialing; zero selects 30 seconds. The operation
+	// context's cancellation or deadline bounds SSH setup.
 	Timeout time.Duration
 	// MaxListEntries bounds one listing; zero selects 10,000.
 	MaxListEntries int
