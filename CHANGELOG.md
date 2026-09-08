@@ -45,6 +45,13 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ### Documentation
 
+- Complete the package entry point with installation, an executable quick
+  start, package selection, construction and lifecycle ownership, operational
+  caveats, and the full support and ecosystem navigation contract.
+- Document every adapter's concurrency and shutdown boundary, correct the root
+  release tag convention, and link the enabled issue, discussion, and private
+  vulnerability-reporting routes.
+
 - Link ecosystem and Integration and Data Movement family guidance to the
   immutable v1.4.0 documentation release.
 

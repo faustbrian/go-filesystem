@@ -1,7 +1,8 @@
 # Compatibility Policy
 
-Each releasable directory is an independent Go module and follows semantic
-versioning. Tags use `<module-directory>/v<version>`.
+The repository contains one releasable root Go module and follows semantic
+versioning. Root releases use `v<version>` tags, such as the current
+`v1.0.0` release.
 
 Before `v1`, minor releases MAY contain reviewed breaking changes, but every
 break MUST be documented with migration guidance. Patch releases MUST remain
