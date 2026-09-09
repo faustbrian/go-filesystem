@@ -134,9 +134,9 @@ func New(root string, options ...Option) (*Adapter, error) {
 }
 
 // Open creates root when absent and acquires one caller-owned root handle.
-// A nil context returns filesystem.ErrContextRequired. A pre-canceled context
-// returns its cancellation cause before options are applied or filesystem I/O
-// begins. The caller must close every successfully returned Adapter.
+// A nil context returns filesystem.ErrContextRequired. An unavailable context
+// returns its cancellation cause before options or between acquisition steps.
+// The caller must close every successfully returned Adapter.
 func Open(ctx context.Context, root string, options ...Option) (*Adapter, error) {
 	return openAdapter(ctx, root, osSystem{}, options...)
 }
@@ -158,12 +158,21 @@ func openAdapter(ctx context.Context, root string, system system, options ...Opt
 			return nil, err
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, context.Cause(ctx)
+	}
 	if err := system.MkdirAll(root, configuration.directoryMode); err != nil {
 		return nil, fmt.Errorf("local: create root: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, context.Cause(ctx)
 	}
 	opened, err := system.OpenRoot(root)
 	if err != nil {
 		return nil, fmt.Errorf("local: open root: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, errors.Join(context.Cause(ctx), opened.Close())
 	}
 	return &Adapter{
 		root:          opened,

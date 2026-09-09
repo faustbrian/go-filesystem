@@ -5,6 +5,8 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-09
+
 ### Added
 
 - Add `local.Open`, `ftp.Open`, and `sftp.Open` for caller-owned resource
@@ -19,6 +21,11 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ### Fixed
 
+- Stop local root acquisition when its context becomes unavailable between
+  option evaluation, root creation, and root opening, and close a root opened
+  concurrently with cancellation.
+- Report invalid Cloudflare R2 prefixes with the `r2` adapter identity while
+  preserving `filesystem.ErrInvalidPath` classification.
 - Run default fuzz smoke campaigns for a deterministic execution count so the
   Go fuzz harness cannot report its own duration deadline as an application
   failure.
@@ -124,5 +131,6 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
   the pinned protocol client cannot safely complete protected data transfers.
   Plaintext passive and active modes are covered by real transfer tests.
 
-[Unreleased]: https://github.com/faustbrian/go-filesystem/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/faustbrian/go-filesystem/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/faustbrian/go-filesystem/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/faustbrian/go-filesystem/releases/tag/v1.0.0

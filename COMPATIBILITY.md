@@ -2,7 +2,7 @@
 
 The repository contains one releasable root Go module and follows semantic
 versioning. Root releases use `v<version>` tags, such as the current
-`v1.0.0` release.
+`v1.1.0` release.
 
 Before `v1`, minor releases MAY contain reviewed breaking changes, but every
 break MUST be documented with migration guidance. Patch releases MUST remain
