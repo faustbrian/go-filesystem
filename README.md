@@ -148,9 +148,10 @@ standard-library traversal is the complete requirement.
 - `memory.New` creates an empty in-process adapter; its zero configuration is
   useful, and `WithClock` supplies a deterministic caller-owned clock. A
   shared adapter requires that callback to be concurrency-safe.
-- `local.New` validates options and opens or creates the configured root. The
-  default denies symlinks and creates files and directories with restrictive
-  permissions; callers close the returned adapter.
+- `local.Open` accepts the caller's context, validates options, and opens or
+  creates the configured root. The default denies symlinks and creates files
+  and directories with restrictive permissions; callers close the returned
+  adapter. The deprecated `local.New` delegates with `context.Background()`.
 - `s3.New` validates a bucket and options around a caller-owned AWS SDK client.
   The caller continues to own the client, credentials, endpoint, and retry
   policy.

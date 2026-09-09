@@ -12,14 +12,17 @@ store := memory.New()
 
 ## Local
 
-Call `local.New(root)` and close the returned adapter. The default policy
-rejects symbolic links and creates files/directories with `0600`/`0700`
-permissions. `local.AllowInternalSymlinks` permits links only when the opened
-root can still contain the operation. Never derive `root` from an untrusted
-request.
+Call `local.Open(ctx, root)` and close the returned adapter. A nil or already
+canceled context fails before options are applied or the host filesystem is
+accessed. The default policy rejects symbolic links and creates
+files/directories with `0600`/`0700` permissions.
+`local.AllowInternalSymlinks` permits links only when the opened root can still
+contain the operation. Never derive `root` from an untrusted request. The
+deprecated `local.New` compatibility function delegates with
+`context.Background()`.
 
 ```go
-store, err := local.New("/var/lib/application/files")
+store, err := local.Open(ctx, "/var/lib/application/files")
 if err != nil {
     return err
 }
@@ -131,7 +134,8 @@ store, err := ftp.Open(ctx, ftp.Config{
 Each acquisition or load returns an error before external I/O when required
 security settings or bounds are invalid. A nil context returns
 `filesystem.ErrContextRequired`, and a pre-canceled context performs no dial or
-configuration load. FTP and SFTP adapters own their sessions; callers must use
-their immediate, idempotent `Close` methods. An HTTP client supplied to R2 is
-borrowed and remains caller-owned. The deprecated `ftp.New`, `sftp.New`, and
-`r2.New` functions delegate to these replacements for source compatibility.
+configuration load or local root acquisition. Local, FTP, and SFTP adapters own
+their acquired resources; callers must use their immediate `Close` methods. An
+HTTP client supplied to R2 is borrowed and remains caller-owned. The deprecated
+`local.New`, `ftp.New`, `sftp.New`, and `r2.New` functions delegate to these
+replacements for source compatibility.

@@ -127,11 +127,27 @@ type Adapter struct {
 }
 
 // New opens root and creates it when absent.
+//
+// Deprecated: use Open to make the acquisition context explicit.
 func New(root string, options ...Option) (*Adapter, error) {
-	return newAdapter(root, osSystem{}, options...)
+	return Open(context.Background(), root, options...)
 }
 
-func newAdapter(root string, system system, options ...Option) (*Adapter, error) {
+// Open creates root when absent and acquires one caller-owned root handle.
+// A nil context returns filesystem.ErrContextRequired. A pre-canceled context
+// returns its cancellation cause before options are applied or filesystem I/O
+// begins. The caller must close every successfully returned Adapter.
+func Open(ctx context.Context, root string, options ...Option) (*Adapter, error) {
+	return openAdapter(ctx, root, osSystem{}, options...)
+}
+
+func openAdapter(ctx context.Context, root string, system system, options ...Option) (*Adapter, error) {
+	if ctx == nil {
+		return nil, filesystem.ErrContextRequired
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, context.Cause(ctx)
+	}
 	configuration := config{
 		fileMode:      0o600,
 		directoryMode: 0o700,

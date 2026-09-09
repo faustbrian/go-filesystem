@@ -7,14 +7,15 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ### Added
 
-- Add `ftp.Open` and `sftp.Open` for caller-owned session acquisition and
-  `r2.Load` for AWS configuration loading, with a shared
+- Add `local.Open`, `ftp.Open`, and `sftp.Open` for caller-owned resource
+  acquisition and `r2.Load` for AWS configuration loading, with a shared
   `filesystem.ErrContextRequired` nil-context classification.
 
 ### Deprecated
 
-- Deprecate the FTP, SFTP, and R2 `New` functions in favor of their explicit
-  acquisition or load names; each remains an exact compatibility delegation.
+- Deprecate the Local, FTP, SFTP, and R2 `New` functions in favor of their
+  explicit acquisition or load names; each remains an exact compatibility
+  delegation.
 
 ### Fixed
 
