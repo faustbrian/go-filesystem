@@ -30,6 +30,49 @@ func TestConformance(t *testing.T) {
 	})
 }
 
+func TestOpenCreatesRoot(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "nested", "root")
+	adapter, err := local.Open(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(root); err != nil {
+		t.Fatalf("created root: %v", err)
+	}
+	if err := adapter.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOpenRejectsUnavailableContextBeforeCreatingRoot(t *testing.T) {
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	for _, test := range []struct {
+		name string
+		ctx  context.Context
+		want error
+	}{
+		{name: "nil", ctx: nil, want: filesystem.ErrContextRequired},
+		{name: "pre-canceled", ctx: canceled, want: context.Canceled},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), "absent")
+			adapter, err := local.Open(test.ctx, root)
+			if adapter != nil {
+				_ = adapter.Close()
+				t.Fatal("Open() adapter != nil")
+			}
+			if !errors.Is(err, test.want) {
+				t.Fatalf("Open() error = %v, want %v", err, test.want)
+			}
+			if _, statErr := os.Stat(root); !errors.Is(statErr, os.ErrNotExist) {
+				t.Fatalf("root stat error = %v, want not exist", statErr)
+			}
+		})
+	}
+}
+
 func TestRootEscapeThroughSymlinkIsRejected(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()

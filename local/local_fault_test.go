@@ -25,23 +25,40 @@ type fakeSystem struct {
 func (s fakeSystem) MkdirAll(string, fs.FileMode) error { return s.mkdirErr }
 func (s fakeSystem) OpenRoot(string) (rootFS, error)    { return s.root, s.openErr }
 
+type trackingSystem struct {
+	mkdirCalls int
+	openCalls  int
+	root       rootFS
+}
+
+func (s *trackingSystem) MkdirAll(string, fs.FileMode) error {
+	s.mkdirCalls++
+	return nil
+}
+
+func (s *trackingSystem) OpenRoot(string) (rootFS, error) {
+	s.openCalls++
+	return s.root, nil
+}
+
 type fakeRoot struct {
-	openFile  localFile
-	openErr   error
-	create    localFile
-	createErr error
-	statInfo  fs.FileInfo
-	statErr   error
-	lstatInfo fs.FileInfo
-	lstatErr  error
-	mkdirErr  error
-	removeErr error
-	linkErr   error
-	renameErr error
-	fsys      fs.FS
-	closeErr  error
-	openFlags int
-	openMode  fs.FileMode
+	openFile   localFile
+	openErr    error
+	create     localFile
+	createErr  error
+	statInfo   fs.FileInfo
+	statErr    error
+	lstatInfo  fs.FileInfo
+	lstatErr   error
+	mkdirErr   error
+	removeErr  error
+	linkErr    error
+	renameErr  error
+	fsys       fs.FS
+	closeErr   error
+	closeCalls int
+	openFlags  int
+	openMode   fs.FileMode
 }
 
 func (r *fakeRoot) Open(string) (localFile, error) { return r.openFile, r.openErr }
@@ -57,7 +74,10 @@ func (r *fakeRoot) Remove(string) error                { return r.removeErr }
 func (r *fakeRoot) Link(string, string) error          { return r.linkErr }
 func (r *fakeRoot) Rename(string, string) error        { return r.renameErr }
 func (r *fakeRoot) FS() fs.FS                          { return r.fsys }
-func (r *fakeRoot) Close() error                       { return r.closeErr }
+func (r *fakeRoot) Close() error {
+	r.closeCalls++
+	return r.closeErr
+}
 
 type fakeFile struct {
 	reader   io.Reader
@@ -112,16 +132,120 @@ func fakeAdapter(root *fakeRoot) *Adapter {
 }
 
 func TestNewAdapterAndOSSystemFailures(t *testing.T) {
-	if adapter, err := newAdapter("root", fakeSystem{mkdirErr: errInjected}); err == nil {
+	if adapter, err := openAdapter(context.Background(), "root", fakeSystem{mkdirErr: errInjected}); err == nil {
 		_ = adapter.Close()
-		t.Fatal("newAdapter(mkdir) error = nil")
+		t.Fatal("openAdapter(mkdir) error = nil")
 	}
-	if adapter, err := newAdapter("root", fakeSystem{openErr: errInjected}); err == nil {
+	if adapter, err := openAdapter(context.Background(), "root", fakeSystem{openErr: errInjected}); err == nil {
 		_ = adapter.Close()
-		t.Fatal("newAdapter(open) error = nil")
+		t.Fatal("openAdapter(open) error = nil")
 	}
 	if _, err := (osSystem{}).OpenRoot("bad\x00root"); err == nil {
 		t.Fatal("osSystem.OpenRoot() error = nil")
+	}
+}
+
+func TestOpenAdapterValidatesBeforeAcquisition(t *testing.T) {
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	cancellationCause := errors.New("caller canceled acquisition")
+	canceledWithCause, cancelWithCause := context.WithCancelCause(context.Background())
+	cancelWithCause(cancellationCause)
+
+	for _, test := range []struct {
+		name            string
+		ctx             context.Context
+		option          Option
+		want            error
+		wantOptionCalls int
+	}{
+		{
+			name: "nil context",
+			ctx:  nil,
+			option: func(*config) error {
+				t.Fatal("option called for nil context")
+				return nil
+			},
+			want: filesystem.ErrContextRequired,
+		},
+		{
+			name: "pre-canceled context",
+			ctx:  canceled,
+			option: func(*config) error {
+				t.Fatal("option called for pre-canceled context")
+				return nil
+			},
+			want: context.Canceled,
+		},
+		{
+			name: "pre-canceled context with cause",
+			ctx:  canceledWithCause,
+			option: func(*config) error {
+				t.Fatal("option called for pre-canceled context")
+				return nil
+			},
+			want: cancellationCause,
+		},
+		{
+			name: "invalid option",
+			ctx:  context.Background(),
+			option: func(*config) error {
+				return errInjected
+			},
+			want:            errInjected,
+			wantOptionCalls: 1,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			option := func(configuration *config) error {
+				calls++
+				return test.option(configuration)
+			}
+			system := &trackingSystem{root: &fakeRoot{}}
+			adapter, err := openAdapter(test.ctx, "root", system, option)
+			if adapter != nil {
+				_ = adapter.Close()
+				t.Fatal("openAdapter() adapter != nil")
+			}
+			if !errors.Is(err, test.want) {
+				t.Fatalf("openAdapter() error = %v, want %v", err, test.want)
+			}
+			if calls != test.wantOptionCalls {
+				t.Fatalf("option calls = %d, want %d", calls, test.wantOptionCalls)
+			}
+			if system.mkdirCalls != 0 || system.openCalls != 0 {
+				t.Fatalf("system calls = MkdirAll %d, OpenRoot %d; want zero", system.mkdirCalls, system.openCalls)
+			}
+		})
+	}
+}
+
+func TestOpenAdapterAcquiresOneCallerOwnedRoot(t *testing.T) {
+	root := &fakeRoot{}
+	system := &trackingSystem{root: root}
+	adapter, err := openAdapter(
+		context.Background(),
+		"root",
+		system,
+		WithFileMode(0o640),
+		WithDirectoryMode(0o750),
+		WithSymlinkPolicy(AllowInternalSymlinks),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if system.mkdirCalls != 1 || system.openCalls != 1 {
+		t.Fatalf("system calls = MkdirAll %d, OpenRoot %d; want one each", system.mkdirCalls, system.openCalls)
+	}
+	if adapter.fileMode != 0o640 || adapter.directoryMode != 0o750 || adapter.symlinkPolicy != AllowInternalSymlinks {
+		t.Fatalf("adapter configuration = file %o, directory %o, symlinks %d", adapter.fileMode, adapter.directoryMode, adapter.symlinkPolicy)
+	}
+	if err := adapter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if root.closeCalls != 1 {
+		t.Fatalf("root Close calls = %d, want 1", root.closeCalls)
 	}
 }
 
