@@ -29,15 +29,23 @@ type trackingSystem struct {
 	mkdirCalls int
 	openCalls  int
 	root       rootFS
+	afterMkdir func()
+	afterOpen  func()
 }
 
 func (s *trackingSystem) MkdirAll(string, fs.FileMode) error {
 	s.mkdirCalls++
+	if s.afterMkdir != nil {
+		s.afterMkdir()
+	}
 	return nil
 }
 
 func (s *trackingSystem) OpenRoot(string) (rootFS, error) {
 	s.openCalls++
+	if s.afterOpen != nil {
+		s.afterOpen()
+	}
 	return s.root, nil
 }
 
@@ -246,6 +254,90 @@ func TestOpenAdapterAcquiresOneCallerOwnedRoot(t *testing.T) {
 	}
 	if root.closeCalls != 1 {
 		t.Fatalf("root Close calls = %d, want 1", root.closeCalls)
+	}
+}
+
+func TestOpenAdapterStopsWhenContextBecomesUnavailableDuringAcquisition(t *testing.T) {
+	cancellationCause := errors.New("caller canceled acquisition")
+	tests := []struct {
+		name           string
+		configure      func(context.CancelCauseFunc, *trackingSystem) Option
+		closeErr       error
+		wantMkdirCalls int
+		wantOpenCalls  int
+		wantCloseCalls int
+	}{
+		{
+			name: "option",
+			configure: func(cancel context.CancelCauseFunc, _ *trackingSystem) Option {
+				return func(*config) error {
+					cancel(cancellationCause)
+					return nil
+				}
+			},
+		},
+		{
+			name: "root creation",
+			configure: func(cancel context.CancelCauseFunc, system *trackingSystem) Option {
+				system.afterMkdir = func() { cancel(cancellationCause) }
+				return func(*config) error { return nil }
+			},
+			wantMkdirCalls: 1,
+		},
+		{
+			name: "root open",
+			configure: func(cancel context.CancelCauseFunc, system *trackingSystem) Option {
+				system.afterOpen = func() { cancel(cancellationCause) }
+				return func(*config) error { return nil }
+			},
+			wantMkdirCalls: 1,
+			wantOpenCalls:  1,
+			wantCloseCalls: 1,
+		},
+		{
+			name: "root open close failure",
+			configure: func(cancel context.CancelCauseFunc, system *trackingSystem) Option {
+				system.afterOpen = func() { cancel(cancellationCause) }
+				return func(*config) error { return nil }
+			},
+			closeErr:       errInjected,
+			wantMkdirCalls: 1,
+			wantOpenCalls:  1,
+			wantCloseCalls: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancelCause(context.Background())
+			root := &fakeRoot{closeErr: test.closeErr}
+			system := &trackingSystem{root: root}
+			option := test.configure(cancel, system)
+
+			adapter, err := openAdapter(ctx, "root", system, option)
+			if adapter != nil {
+				_ = adapter.Close()
+				t.Fatal("openAdapter() adapter != nil")
+			}
+			if !errors.Is(err, cancellationCause) {
+				t.Fatalf("openAdapter() error = %v, want cancellation cause", err)
+			}
+			if test.closeErr != nil && !errors.Is(err, test.closeErr) {
+				t.Fatalf("openAdapter() error = %v, want close error", err)
+			}
+			if system.mkdirCalls != test.wantMkdirCalls || system.openCalls != test.wantOpenCalls {
+				t.Fatalf(
+					"system calls = MkdirAll %d, OpenRoot %d; want %d, %d",
+					system.mkdirCalls,
+					system.openCalls,
+					test.wantMkdirCalls,
+					test.wantOpenCalls,
+				)
+			}
+			if root.closeCalls != test.wantCloseCalls {
+				t.Fatalf("root Close calls = %d, want %d", root.closeCalls, test.wantCloseCalls)
+			}
+		})
 	}
 }
 

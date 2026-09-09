@@ -55,8 +55,8 @@ func TestOptionsReachR2Transport(t *testing.T) {
 	}
 
 	configuration.Prefix = "../escape"
-	if _, err := New(context.Background(), configuration); err == nil {
-		t.Fatal("New(invalid prefix) error = nil")
+	if _, err := Load(context.Background(), configuration); !errors.Is(err, filesystem.ErrInvalidPath) || !strings.HasPrefix(err.Error(), "r2: invalid prefix:") {
+		t.Fatalf("Load(invalid prefix) error = %v", err)
 	}
 	if _, err := New(context.Background(), validConfig, WithMaxListEntries(0)); err == nil {
 		t.Fatal("New(invalid maximum) error = nil")

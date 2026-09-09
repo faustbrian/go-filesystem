@@ -21,8 +21,8 @@ policy or erase backend-specific consistency, atomicity, durability,
 permissions, or retry behavior.
 
 The module has a stable v1 API and requires Go 1.26.6 or newer. The latest
-public release is `v1.0.0`; additive acquisition APIs on `main` remain
-unreleased until the next tagged version.
+public release is `v1.1.0`, which includes the additive context-aware
+acquisition APIs.
 
 The API is portable Go. The release gate runs on Ubuntu 24.04; the local
 adapter additionally requires a target supported by `os.Root` and retains the

@@ -215,7 +215,7 @@ func newWithLoaderAndTransport(
 	}
 	if configuration.Prefix != "" {
 		if _, err := filesystem.ParsePath(configuration.Prefix); err != nil {
-			return nil, fmt.Errorf("s3: invalid prefix: %w", err)
+			return nil, fmt.Errorf("r2: invalid prefix: %w", err)
 		}
 	}
 	if err := ctx.Err(); err != nil {
