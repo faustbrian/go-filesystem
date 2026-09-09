@@ -228,6 +228,7 @@ Start with the [documentation index](docs/README.md),
 [operations guide](docs/operations.md). Adoption and maintenance references
 include the [API reference](https://pkg.go.dev/github.com/faustbrian/go-filesystem),
 [executable example](example_test.go), [`fstest` testing helpers](https://pkg.go.dev/github.com/faustbrian/go-filesystem/fstest),
+[filesystem and tabular ingestion recipe](integration/tabular-ingestion/README.md),
 [architecture](ARCHITECTURE.md), [compatibility](COMPATIBILITY.md),
 [performance and verification evidence](docs/verification.md),
 [FAQ](FAQ.md), [troubleshooting](TROUBLESHOOTING.md),
