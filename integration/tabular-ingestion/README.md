@@ -9,7 +9,7 @@ code, not a framework bootstrap or application dependency.
 
 The verified version set is:
 
-- `github.com/faustbrian/go-filesystem` v1.0.0; and
+- `github.com/faustbrian/go-filesystem` v1.1.0; and
 - `github.com/faustbrian/go-tabular` v1.0.0.
 
 The application depends on both modules. `filesystem` does not import
