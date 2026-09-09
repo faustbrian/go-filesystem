@@ -133,6 +133,18 @@
       "coverage_required": true,
       "build_required": true,
       "build_tags": []
+    },
+    {
+      "module_directory": "integration/tabular-ingestion",
+      "directory": ".",
+      "name": "filesystemtabular",
+      "import_path": "github.com/faustbrian/go-filesystem/integration/tabular-ingestion",
+      "kind": "harness",
+      "production": false,
+      "executable": true,
+      "coverage_required": false,
+      "build_required": true,
+      "build_tags": []
     }
   ]
 }

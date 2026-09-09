@@ -45,6 +45,9 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ### Documentation
 
+- Add a non-releasable executable recipe for bounded filesystem-to-tabular CSV
+  ingestion, including cancellation, error ownership, and close ordering.
+
 - Complete the package entry point with installation, an executable quick
   start, package selection, construction and lifecycle ownership, operational
   caveats, and the full support and ecosystem navigation contract.

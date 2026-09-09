@@ -213,7 +213,8 @@
           "github.com/faustbrian/go-filesystem/sftp"
         ],
         "companions": [
-          "github.com/faustbrian/go-filesystem/fstest"
+          "github.com/faustbrian/go-filesystem/fstest",
+          "github.com/faustbrian/go-tabular"
         ],
         "supported_go": {
           "minimum": "1.26.6",
@@ -262,6 +263,7 @@
       "tag_prefix": "v",
       "owned_dependencies": [],
       "reverse_owned_dependencies": [
+        "github.com/faustbrian/go-filesystem/integration/tabular-ingestion",
         "github.com/faustbrian/go-service/integration/reference-external"
       ],
       "external_runtime_dependencies": [
@@ -295,6 +297,64 @@
         "lint": true,
         "mutation": true,
         "race": true,
+        "security": true,
+        "tests": true
+      }
+    },
+    {
+      "directory": "integration/tabular-ingestion",
+      "module_path": "github.com/faustbrian/go-filesystem/integration/tabular-ingestion",
+      "go_version": "1.26.6",
+      "packages": [
+        {
+          "module_directory": "integration/tabular-ingestion",
+          "directory": ".",
+          "name": "filesystemtabular",
+          "import_path": "github.com/faustbrian/go-filesystem/integration/tabular-ingestion",
+          "kind": "harness",
+          "production": false,
+          "executable": true,
+          "coverage_required": false,
+          "build_required": true,
+          "build_tags": []
+        }
+      ],
+      "purpose": "This non-releasable integration module proves bounded, cancellation-aware streaming from a filesystem.Reader into tabular CSV parsing with explicit error and close ownership.",
+      "lifecycle": "internal",
+      "kind": "interoperability harness",
+      "releasable": false,
+      "family": "integration-and-data-movement",
+      "family_label": "Integration And Data Movement",
+      "family_description": "Bounded external I/O, data movement, provider boundaries, and derived search state.",
+      "family_order": 7,
+      "version": "unreleased",
+      "tag_prefix": "integration/tabular-ingestion/v",
+      "owned_dependencies": [
+        "github.com/faustbrian/go-filesystem",
+        "github.com/faustbrian/go-tabular"
+      ],
+      "reverse_owned_dependencies": [],
+      "external_runtime_dependencies": [],
+      "required_services": [],
+      "build_tags": [],
+      "test_tags": [],
+      "interoperability_tools": [],
+      "specifications": [],
+      "conformance_corpora": [],
+      "provenance": [],
+      "goal_files": [],
+      "goal_status": "not-applicable",
+      "goal_evidence": [],
+      "gates": {
+        "api_compatibility": false,
+        "benchmarks": false,
+        "conformance": false,
+        "coverage": false,
+        "documentation": true,
+        "fuzz": false,
+        "lint": true,
+        "mutation": false,
+        "race": false,
         "security": true,
         "tests": true
       }

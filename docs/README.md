@@ -16,6 +16,7 @@ points for the single releasable
 
 - [Operations](operations.md)
 - [Executable example](../example_test.go)
+- [Filesystem and tabular ingestion recipe](../integration/tabular-ingestion/README.md)
 - [`fstest` testing helpers](https://pkg.go.dev/github.com/faustbrian/go-filesystem/fstest)
 - [Compatibility and migration policy](../COMPATIBILITY.md)
 - [FAQ](../FAQ.md)
