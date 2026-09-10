@@ -1,6 +1,6 @@
 module github.com/faustbrian/go-filesystem/integration/tabular-ingestion
 
-go 1.26.6
+go 1.27.0
 
 require (
 	github.com/faustbrian/go-filesystem v1.1.0

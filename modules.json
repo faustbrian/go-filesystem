@@ -6,7 +6,7 @@
     {
       "directory": ".",
       "module_path": "github.com/faustbrian/go-filesystem",
-      "go_version": "1.26.6",
+      "go_version": "1.27.0",
       "packages": [
         {
           "module_directory": ".",
@@ -217,7 +217,7 @@
           "github.com/faustbrian/go-tabular"
         ],
         "supported_go": {
-          "minimum": "1.26.6",
+          "minimum": "1.27.0",
           "tested": [
             "1.27.0"
           ]
@@ -304,7 +304,7 @@
     {
       "directory": "integration/tabular-ingestion",
       "module_path": "github.com/faustbrian/go-filesystem/integration/tabular-ingestion",
-      "go_version": "1.26.6",
+      "go_version": "1.27.0",
       "packages": [
         {
           "module_directory": "integration/tabular-ingestion",

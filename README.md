@@ -20,7 +20,7 @@ decorators, and conformance helpers. It does not select an application storage
 policy or erase backend-specific consistency, atomicity, durability,
 permissions, or retry behavior.
 
-The module has a stable v1 API and requires Go 1.26.6 or newer. The latest
+The module has a stable v1 API and requires Go 1.27.0 or newer. The latest
 public release is `v1.1.0`, which includes the additive context-aware
 acquisition APIs.
 
