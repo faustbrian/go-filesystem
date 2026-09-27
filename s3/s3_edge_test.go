@@ -12,7 +12,7 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	awstypes "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
-	filesystem "github.com/faustbrian/go-filesystem"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
 )
 
 func TestPublicConstructorsAndOptions(t *testing.T) {

@@ -13,8 +13,8 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
-	filesystem "github.com/faustbrian/go-filesystem"
-	filesystemS3 "github.com/faustbrian/go-filesystem/s3"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
+	filesystemS3 "github.com/faustbrian/go-filesystem/v2/s3"
 )
 
 var errInjected = errors.New("injected R2 failure")

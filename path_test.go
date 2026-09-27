@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	filesystem "github.com/faustbrian/go-filesystem"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
 )
 
 func TestParsePathNormalizesLogicalPaths(t *testing.T) {

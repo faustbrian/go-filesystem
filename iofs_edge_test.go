@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	filesystem "github.com/faustbrian/go-filesystem"
-	"github.com/faustbrian/go-filesystem/memory"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
+	"github.com/faustbrian/go-filesystem/v2/memory"
 )
 
 type readerFunc func(context.Context, filesystem.Path) (io.ReadCloser, error)

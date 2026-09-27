@@ -16,7 +16,7 @@ api:
   baselines:
     - module: .
       mode: apidiff
-      path: api/baseline.txt
+      path: api/v2.txt
 operations:
   - module: .
     gate: fuzz

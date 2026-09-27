@@ -10,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
-	filesystem "github.com/faustbrian/go-filesystem"
-	"github.com/faustbrian/go-filesystem/local"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
+	"github.com/faustbrian/go-filesystem/v2/local"
 )
 
 func TestOptionsValidateModesAndSymlinkPolicy(t *testing.T) {

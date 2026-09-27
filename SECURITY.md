@@ -12,7 +12,11 @@ with the affected version, reproduction, and impact.
   paths outside an adapter.
 - Local storage denies symlinks by default and uses an opened root to contain
   filesystem operations.
-- SFTP requires explicit host-key verification and rejects symlink traversal.
+- SFTP requires explicit host-key verification. FTP and SFTP reject observed
+  links, but cannot atomically combine that check with path use. Their default
+  root is `/`: the authenticated server namespace, not a client subdirectory,
+  is the confinement boundary. Non-root directories require
+  `AllowUnsafeSubroot` and server-side isolation.
 - FTPS currently fails before dialing because protected data transfers are not
   verified with the pinned client. Plaintext FTP requires an explicit opt-in
   and an independently encrypted network.
@@ -32,7 +36,7 @@ and egress policy before accepting storage configuration from another tenant.
 | Threat | Control | Executable evidence |
 |---|---|---|
 | Traversal and root escape | strict logical paths and `os.Root` | path fuzzing and concurrent local symlink replacement |
-| Symlink redirection | deny-by-default local/SFTP policies | adapter mutation, listing, and fuzz tests |
+| Symlink redirection | local rooted operations; remote server namespace confinement | remote constructor rejection and check/use characterization tests |
 | Credential disclosure | endpoint validation and error redaction | R2 endpoint matrix and redaction fuzz corpus |
 | Endpoint SSRF | HTTPS account endpoints; loopback-only development override | R2 endpoint validation tests |
 | Partial publication | temporary files or multipart completion | failure cleanup and MinIO orphan checks |
@@ -43,3 +47,16 @@ proxy, credentials, region, and retry policy are part of the caller's trusted
 configuration boundary. R2 owns those choices and rejects endpoint credentials,
 queries, fragments, non-root paths, non-HTTPS production URLs, and non-loopback
 HTTP development endpoints.
+
+### Remote subdirectory risk
+
+An administrator or another remote writer can replace a checked ancestor with
+a symbolic link before FTP/SFTP uses it. Client preflight checks do not prevent
+this race. The deploying application and storage administrator own this risk
+when explicitly setting `AllowUnsafeSubroot`: jail the account to the intended
+namespace or enforce server ACLs/ownership preventing hostile path mutation.
+Keep the option false otherwise. Reassess the opt-in when server isolation or
+ownership changes, or a supported protocol exposes an atomic no-follow,
+directory-relative operation.
+
+See the scoped [remote confinement threat model](docs/security-threat-model.md).

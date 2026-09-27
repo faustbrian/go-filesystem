@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	filesystem "github.com/faustbrian/go-filesystem"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
 )
 
 var _ func(context.Context, Config, ...Option) (*Adapter, error) = Load

@@ -5,6 +5,20 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Security
+
+- FTP and SFTP reject non-root remote directories before dialing unless the
+  caller explicitly sets `AllowUnsafeSubroot`. Client symlink checks cannot
+  prevent concurrent remote link replacement; server-enforced account isolation
+  is the confinement boundary.
+
+### Changed
+
+- Move the root module and imports to `github.com/faustbrian/go-filesystem/v2`
+  for the breaking remote-root default. Prefer `Root: "/"` inside a jailed
+  server namespace. Existing non-root deployments must provide server-side
+  isolation before opting in to `AllowUnsafeSubroot`.
+
 ## [1.1.0] - 2026-09-09
 
 ### Added

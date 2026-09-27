@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	filesystem "github.com/faustbrian/go-filesystem"
-	filesystemtest "github.com/faustbrian/go-filesystem/fstest"
-	"github.com/faustbrian/go-filesystem/memory"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
+	filesystemtest "github.com/faustbrian/go-filesystem/v2/fstest"
+	"github.com/faustbrian/go-filesystem/v2/memory"
 )
 
 func TestConformanceSuiteCoversSupportedAndUnsupportedCapabilities(t *testing.T) {

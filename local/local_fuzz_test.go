@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	filesystem "github.com/faustbrian/go-filesystem"
-	"github.com/faustbrian/go-filesystem/local"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
+	"github.com/faustbrian/go-filesystem/v2/local"
 )
 
 func FuzzSymlinkContainment(f *testing.F) {

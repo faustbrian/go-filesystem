@@ -19,8 +19,8 @@ import (
 	"time"
 	"unicode"
 
-	filesystem "github.com/faustbrian/go-filesystem"
-	"github.com/faustbrian/go-filesystem/internal/streamwriter"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
+	"github.com/faustbrian/go-filesystem/v2/internal/streamwriter"
 	protocol "github.com/gonzalop/ftp"
 )
 
@@ -58,6 +58,9 @@ type Config struct {
 	Password string
 	// Root is the absolute remote directory containing all logical paths.
 	Root string
+	// AllowUnsafeSubroot permits a Root other than "/". FTP cannot atomically
+	// reject links and use a path; callers must enforce confinement at the server.
+	AllowUnsafeSubroot bool
 	// TLSMode selects transport security. Only explicitly allowed plaintext is
 	// currently operational; TLS modes fail closed before dialing.
 	TLSMode TLSMode
@@ -173,6 +176,9 @@ func Open(ctx context.Context, configuration Config) (*Adapter, error) {
 	root, err := validateRoot(configuration.Root)
 	if err != nil {
 		return nil, err
+	}
+	if root != "/" && !configuration.AllowUnsafeSubroot {
+		return nil, errors.New("ftp: subroot requires explicit unsafe opt-in and server-side isolation")
 	}
 	if configuration.Timeout < 0 {
 		return nil, errors.New("ftp: timeout must not be negative")

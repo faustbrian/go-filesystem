@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	filesystem "github.com/faustbrian/go-filesystem"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
 )
 
 func FuzzMalformedListingEntry(f *testing.F) {

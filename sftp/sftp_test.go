@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	filesystem "github.com/faustbrian/go-filesystem"
-	"github.com/faustbrian/go-filesystem/fstest"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
+	"github.com/faustbrian/go-filesystem/v2/fstest"
 	pkgsftp "github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )

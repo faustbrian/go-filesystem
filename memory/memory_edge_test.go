@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	filesystem "github.com/faustbrian/go-filesystem"
-	"github.com/faustbrian/go-filesystem/memory"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
+	"github.com/faustbrian/go-filesystem/v2/memory"
 )
 
 func TestCanceledOperationsStopBeforeMutation(t *testing.T) {

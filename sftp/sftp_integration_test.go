@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/faustbrian/go-filesystem/fstest"
+	"github.com/faustbrian/go-filesystem/v2/fstest"
 	pkgsftp "github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -23,12 +23,13 @@ func TestRealSFTPServerConformance(t *testing.T) {
 		t.Helper()
 		root := filepath.Join(t.TempDir(), "storage")
 		adapter, err := Open(context.Background(), Config{
-			Address:         server.address,
-			User:            "test",
-			Auth:            []ssh.AuthMethod{ssh.Password("secret")},
-			HostKeyCallback: ssh.FixedHostKey(server.hostKey),
-			Root:            root,
-			MaxListEntries:  100,
+			Address:            server.address,
+			User:               "test",
+			Auth:               []ssh.AuthMethod{ssh.Password("secret")},
+			HostKeyCallback:    ssh.FixedHostKey(server.hostKey),
+			Root:               root,
+			AllowUnsafeSubroot: true, // The loopback fixture has no untrusted concurrent path writers.
+			MaxListEntries:     100,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -52,11 +53,12 @@ func TestRealSessionStandardRename(t *testing.T) {
 		t.Fatal(err)
 	}
 	adapter, err := New(context.Background(), Config{
-		Address:         server.address,
-		User:            "test",
-		Auth:            []ssh.AuthMethod{ssh.Password("secret")},
-		HostKeyCallback: ssh.FixedHostKey(server.hostKey),
-		Root:            root,
+		Address:            server.address,
+		User:               "test",
+		Auth:               []ssh.AuthMethod{ssh.Password("secret")},
+		HostKeyCallback:    ssh.FixedHostKey(server.hostKey),
+		Root:               root,
+		AllowUnsafeSubroot: true, // The loopback fixture has no untrusted concurrent path writers.
 	})
 	if err != nil {
 		t.Fatal(err)

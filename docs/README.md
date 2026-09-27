@@ -3,7 +3,7 @@
 The root [README](../README.md) contains installation, the compiler-checked
 quick start, package selection, construction, lifecycle, and ecosystem entry
 points for the single releasable
-`github.com/faustbrian/go-filesystem` module.
+`github.com/faustbrian/go-filesystem/v2` module.
 
 ## Concepts and design
 
@@ -17,7 +17,7 @@ points for the single releasable
 - [Operations](operations.md)
 - [Executable example](../example_test.go)
 - [Filesystem and tabular ingestion recipe](../integration/tabular-ingestion/README.md)
-- [`fstest` testing helpers](https://pkg.go.dev/github.com/faustbrian/go-filesystem/fstest)
+- [`fstest` testing helpers](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2/fstest)
 - [Compatibility and migration policy](../COMPATIBILITY.md)
 - [FAQ](../FAQ.md)
 - [Troubleshooting](../TROUBLESHOOTING.md)
@@ -27,7 +27,7 @@ points for the single releasable
 - [Security model and private reporting](../SECURITY.md)
 - [Support](../SUPPORT.md)
 - [Verification matrix](verification.md)
-- [Public API reference](https://pkg.go.dev/github.com/faustbrian/go-filesystem)
+- [Public API reference](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2)
 
 ## Maintenance
 

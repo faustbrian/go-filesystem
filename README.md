@@ -5,7 +5,7 @@
 [![Coverage](https://img.shields.io/badge/coverage-100%25_required-blue)](CONTRIBUTING.md#verification)
 [![Mutation](https://img.shields.io/badge/mutation-100%25_required-blue)](CONTRIBUTING.md#verification)
 [![Documentation](https://img.shields.io/badge/docs-checked_in_CI-blue)](docs/)
-[![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-filesystem.svg)](https://pkg.go.dev/github.com/faustbrian/go-filesystem)
+[![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-filesystem/v2.svg)](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2)
 [![Release](https://img.shields.io/github/v/release/faustbrian/go-filesystem?sort=semver)](https://github.com/faustbrian/go-filesystem/releases)
 [![Go](https://img.shields.io/badge/go-1.27.0-00ADD8?logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -36,7 +36,7 @@ and [integration and data movement family guidance](https://github.com/faustbria
 ## Installation
 
 ```sh
-go get github.com/faustbrian/go-filesystem@v1
+go get github.com/faustbrian/go-filesystem/v2@v2
 ```
 
 ## Quick start
@@ -57,8 +57,8 @@ import (
     "io"
     "strings"
 
-    filesystem "github.com/faustbrian/go-filesystem"
-    "github.com/faustbrian/go-filesystem/memory"
+    filesystem "github.com/faustbrian/go-filesystem/v2"
+    "github.com/faustbrian/go-filesystem/v2/memory"
 )
 
 func main() {
@@ -117,18 +117,18 @@ wraps `filesystem.ErrUnsupportedCapability`.
 
 | Package | Use |
 | --- | --- |
-| [`filesystem`](https://pkg.go.dev/github.com/faustbrian/go-filesystem) | Define logical paths, capability contracts, options, entries, typed errors, and the read-only `io/fs` bridge. |
-| [`decorator`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/decorator) | Add prefixes, read-only policy, streaming checksums, safe setup retries, or instrumentation around an adapter. |
-| [`local`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/local) | Store files beneath an opened, symlink-controlled local root. |
-| [`memory`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/memory) | Use deterministic, concurrency-safe in-memory storage for ephemeral data and tests. |
-| [`s3`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/s3) | Adapt a caller-configured AWS SDK v2 client to Amazon S3 or an explicitly configured compatible service. |
-| [`r2`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/r2) | Load and validate Cloudflare R2 configuration with R2-specific transport semantics. |
-| [`sftp`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/sftp) | Acquire bounded SFTP access with explicit authentication, host verification, and session ownership. |
-| [`ftp`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/ftp) | Acquire bounded plaintext FTP access only after an explicit security opt-in. |
-| [`fstest`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/fstest) | Test adapter conformance and deterministic stream, iterator, and transport faults; close every started TCP fault proxy. |
+| [`filesystem`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2) | Define logical paths, capability contracts, options, entries, typed errors, and the read-only `io/fs` bridge. |
+| [`decorator`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2/decorator) | Add prefixes, read-only policy, streaming checksums, safe setup retries, or instrumentation around an adapter. |
+| [`local`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2/local) | Store files beneath an opened, symlink-controlled local root. |
+| [`memory`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2/memory) | Use deterministic, concurrency-safe in-memory storage for ephemeral data and tests. |
+| [`s3`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2/s3) | Adapt a caller-configured AWS SDK v2 client to Amazon S3 or an explicitly configured compatible service. |
+| [`r2`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2/r2) | Load and validate Cloudflare R2 configuration with R2-specific transport semantics. |
+| [`sftp`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2/sftp) | Acquire bounded SFTP access with explicit authentication, host verification, and session ownership. |
+| [`ftp`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2/ftp) | Acquire bounded plaintext FTP access only after an explicit security opt-in. |
+| [`fstest`](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2/fstest) | Test adapter conformance and deterministic stream, iterator, and transport faults; close every started TCP fault proxy. |
 
 All packages are part of the single
-`github.com/faustbrian/go-filesystem` module; there are no releasable nested
+`github.com/faustbrian/go-filesystem/v2` module; there are no releasable nested
 modules.
 
 ## When to use it
@@ -227,8 +227,8 @@ Start with the [documentation index](docs/README.md),
 [capability matrix](docs/capabilities.md), [adapter guide](docs/adapters.md),
 [decorator guide](docs/decorators.md), and
 [operations guide](docs/operations.md). Adoption and maintenance references
-include the [API reference](https://pkg.go.dev/github.com/faustbrian/go-filesystem),
-[executable example](example_test.go), [`fstest` testing helpers](https://pkg.go.dev/github.com/faustbrian/go-filesystem/fstest),
+include the [API reference](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2),
+[executable example](example_test.go), [`fstest` testing helpers](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2/fstest),
 [filesystem and tabular ingestion recipe](integration/tabular-ingestion/README.md),
 [architecture](ARCHITECTURE.md), [compatibility](COMPATIBILITY.md),
 [performance and verification evidence](docs/verification.md),

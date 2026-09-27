@@ -11,7 +11,7 @@ import (
 	iofstest "testing/fstest"
 	"time"
 
-	filesystem "github.com/faustbrian/go-filesystem"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
 )
 
 var errInjected = errors.New("injected operating system failure")

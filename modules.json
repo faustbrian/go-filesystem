@@ -5,14 +5,14 @@
   "modules": [
     {
       "directory": ".",
-      "module_path": "github.com/faustbrian/go-filesystem",
+      "module_path": "github.com/faustbrian/go-filesystem/v2",
       "go_version": "1.27.0",
       "packages": [
         {
           "module_directory": ".",
           "directory": ".",
           "name": "filesystem",
-          "import_path": "github.com/faustbrian/go-filesystem",
+          "import_path": "github.com/faustbrian/go-filesystem/v2",
           "kind": "public",
           "production": true,
           "executable": true,
@@ -24,7 +24,7 @@
           "module_directory": ".",
           "directory": "decorator",
           "name": "decorator",
-          "import_path": "github.com/faustbrian/go-filesystem/decorator",
+          "import_path": "github.com/faustbrian/go-filesystem/v2/decorator",
           "kind": "public",
           "production": true,
           "executable": true,
@@ -36,7 +36,7 @@
           "module_directory": ".",
           "directory": "fstest",
           "name": "fstest",
-          "import_path": "github.com/faustbrian/go-filesystem/fstest",
+          "import_path": "github.com/faustbrian/go-filesystem/v2/fstest",
           "kind": "test support",
           "production": false,
           "executable": true,
@@ -48,7 +48,7 @@
           "module_directory": ".",
           "directory": "ftp",
           "name": "ftp",
-          "import_path": "github.com/faustbrian/go-filesystem/ftp",
+          "import_path": "github.com/faustbrian/go-filesystem/v2/ftp",
           "kind": "public",
           "production": true,
           "executable": true,
@@ -60,7 +60,7 @@
           "module_directory": ".",
           "directory": "internal/redact",
           "name": "redact",
-          "import_path": "github.com/faustbrian/go-filesystem/internal/redact",
+          "import_path": "github.com/faustbrian/go-filesystem/v2/internal/redact",
           "kind": "internal",
           "production": true,
           "executable": true,
@@ -72,7 +72,7 @@
           "module_directory": ".",
           "directory": "internal/streamwriter",
           "name": "streamwriter",
-          "import_path": "github.com/faustbrian/go-filesystem/internal/streamwriter",
+          "import_path": "github.com/faustbrian/go-filesystem/v2/internal/streamwriter",
           "kind": "internal",
           "production": true,
           "executable": true,
@@ -84,7 +84,7 @@
           "module_directory": ".",
           "directory": "local",
           "name": "local",
-          "import_path": "github.com/faustbrian/go-filesystem/local",
+          "import_path": "github.com/faustbrian/go-filesystem/v2/local",
           "kind": "public",
           "production": true,
           "executable": true,
@@ -96,7 +96,7 @@
           "module_directory": ".",
           "directory": "memory",
           "name": "memory",
-          "import_path": "github.com/faustbrian/go-filesystem/memory",
+          "import_path": "github.com/faustbrian/go-filesystem/v2/memory",
           "kind": "public",
           "production": true,
           "executable": true,
@@ -108,7 +108,7 @@
           "module_directory": ".",
           "directory": "r2",
           "name": "r2",
-          "import_path": "github.com/faustbrian/go-filesystem/r2",
+          "import_path": "github.com/faustbrian/go-filesystem/v2/r2",
           "kind": "public",
           "production": true,
           "executable": true,
@@ -120,7 +120,7 @@
           "module_directory": ".",
           "directory": "s3",
           "name": "s3",
-          "import_path": "github.com/faustbrian/go-filesystem/s3",
+          "import_path": "github.com/faustbrian/go-filesystem/v2/s3",
           "kind": "public",
           "production": true,
           "executable": true,
@@ -132,7 +132,7 @@
           "module_directory": ".",
           "directory": "sftp",
           "name": "sftp",
-          "import_path": "github.com/faustbrian/go-filesystem/sftp",
+          "import_path": "github.com/faustbrian/go-filesystem/v2/sftp",
           "kind": "public",
           "production": true,
           "executable": true,
@@ -164,18 +164,18 @@
         ],
         "public_package_identifier": "filesystem",
         "primary_entry_packages": [
-          "github.com/faustbrian/go-filesystem"
+          "github.com/faustbrian/go-filesystem/v2"
         ],
         "package_selection": {
-          "github.com/faustbrian/go-filesystem": "Use for capability-oriented streaming filesystem contracts, logical paths, typed errors, and standard io/fs interoperability.",
-          "github.com/faustbrian/go-filesystem/decorator": "Use to add prefixes, read-only policy, checksums, safe retries, or instrumentation around an existing filesystem contract.",
-          "github.com/faustbrian/go-filesystem/fstest": "Use in tests for backend conformance, deterministic faults, and transport fault injection.",
-          "github.com/faustbrian/go-filesystem/ftp": "Use Open for bounded FTP access when its weaker protocol guarantees are explicitly acceptable.",
-          "github.com/faustbrian/go-filesystem/local": "Use Open for context-preflighted, root-contained local filesystem acquisition with explicit caller ownership, symlink policy, and publication behavior.",
-          "github.com/faustbrian/go-filesystem/memory": "Use for deterministic in-memory storage and tests without external I/O.",
-          "github.com/faustbrian/go-filesystem/r2": "Use Load for Cloudflare R2 configuration through an explicitly configured S3-compatible client.",
-          "github.com/faustbrian/go-filesystem/s3": "Use for Amazon S3 or explicitly configured S3-compatible object storage.",
-          "github.com/faustbrian/go-filesystem/sftp": "Use Open for bounded SFTP access with explicit host verification and connection ownership."
+          "github.com/faustbrian/go-filesystem/v2": "Use for capability-oriented streaming filesystem contracts, logical paths, typed errors, and standard io/fs interoperability.",
+          "github.com/faustbrian/go-filesystem/v2/decorator": "Use to add prefixes, read-only policy, checksums, safe retries, or instrumentation around an existing filesystem contract.",
+          "github.com/faustbrian/go-filesystem/v2/fstest": "Use in tests for backend conformance, deterministic faults, and transport fault injection.",
+          "github.com/faustbrian/go-filesystem/v2/ftp": "Use Open for bounded FTP access when its weaker protocol guarantees are explicitly acceptable.",
+          "github.com/faustbrian/go-filesystem/v2/local": "Use Open for context-preflighted, root-contained local filesystem acquisition with explicit caller ownership, symlink policy, and publication behavior.",
+          "github.com/faustbrian/go-filesystem/v2/memory": "Use for deterministic in-memory storage and tests without external I/O.",
+          "github.com/faustbrian/go-filesystem/v2/r2": "Use Load for Cloudflare R2 configuration through an explicitly configured S3-compatible client.",
+          "github.com/faustbrian/go-filesystem/v2/s3": "Use for Amazon S3 or explicitly configured S3-compatible object storage.",
+          "github.com/faustbrian/go-filesystem/v2/sftp": "Use Open for bounded SFTP access with explicit host verification and connection ownership."
         },
         "lifecycle_status": "active",
         "maturity": "stable",
@@ -204,16 +204,16 @@
         },
         "optional_owned_dependencies": [],
         "adapters": [
-          "github.com/faustbrian/go-filesystem/decorator",
-          "github.com/faustbrian/go-filesystem/ftp",
-          "github.com/faustbrian/go-filesystem/local",
-          "github.com/faustbrian/go-filesystem/memory",
-          "github.com/faustbrian/go-filesystem/r2",
-          "github.com/faustbrian/go-filesystem/s3",
-          "github.com/faustbrian/go-filesystem/sftp"
+          "github.com/faustbrian/go-filesystem/v2/decorator",
+          "github.com/faustbrian/go-filesystem/v2/ftp",
+          "github.com/faustbrian/go-filesystem/v2/local",
+          "github.com/faustbrian/go-filesystem/v2/memory",
+          "github.com/faustbrian/go-filesystem/v2/r2",
+          "github.com/faustbrian/go-filesystem/v2/s3",
+          "github.com/faustbrian/go-filesystem/v2/sftp"
         ],
         "companions": [
-          "github.com/faustbrian/go-filesystem/fstest",
+          "github.com/faustbrian/go-filesystem/v2/fstest",
           "github.com/faustbrian/go-tabular"
         ],
         "supported_go": {
@@ -249,7 +249,7 @@
           "examples": "example_test.go",
           "faq": "FAQ.md",
           "changelog": "CHANGELOG.md",
-          "pkg_go_dev": "https://pkg.go.dev/github.com/faustbrian/go-filesystem",
+          "pkg_go_dev": "https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2",
           "ecosystem_index": "https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/README.md"
         },
         "known_good_compatibility_sets": [],
@@ -259,7 +259,7 @@
           "release": "not-started"
         }
       },
-      "version": "1.1.0",
+      "version": "2.0.0",
       "tag_prefix": "v",
       "owned_dependencies": [],
       "reverse_owned_dependencies": [

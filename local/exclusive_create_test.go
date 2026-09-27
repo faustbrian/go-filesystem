@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	filesystem "github.com/faustbrian/go-filesystem"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
 )
 
 func TestWriteUsesExclusiveCreateFlagsAndConfiguredMode(t *testing.T) {

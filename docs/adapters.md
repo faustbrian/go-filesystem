@@ -84,9 +84,14 @@ store, err := r2.Load(ctx, r2.Config{
 Provide an address, user, one or more `ssh.AuthMethod` values, and a real
 `ssh.HostKeyCallback`. Use `knownhosts.New` for normal deployments. The adapter
 rejects a missing callback; `ssh.InsecureIgnoreHostKey` should not be used in
-production. Set a rooted absolute server directory and close the adapter.
+production. Use root `/` inside the server-enforced account namespace and close
+the adapter.
 
-The adapter rejects symlink traversal. Read-safe opens may reconnect once.
+The adapter rejects observed links but cannot prevent a concurrent link swap
+between preflight and use. FTP and SFTP default to root `/`; a non-root
+directory requires `AllowUnsafeSubroot: true` and server-enforced isolation.
+The flag acknowledges the limitation, it does not make client checks atomic.
+Read-safe opens may reconnect once.
 Writes are never replayed after an uncertain failure. Move is advertised only
 when the server negotiates the OpenSSH POSIX rename extension.
 
@@ -100,7 +105,7 @@ store, err := sftp.Open(ctx, sftp.Config{
     User:            "application",
     Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
     HostKeyCallback: hostKeys,
-    Root:            "/srv/application",
+    Root:            "/", // The server must jail this account to its storage namespace.
 })
 ```
 
@@ -125,7 +130,7 @@ store, err := ftp.Open(ctx, ftp.Config{
     Address:  "files.example.com:21",
     Username: os.Getenv("FTP_USERNAME"),
     Password: os.Getenv("FTP_PASSWORD"),
-    Root:     "/application",
+    Root:     "/", // The server must jail this account to its storage namespace.
     TLSMode:        ftp.TLSPlaintext,
     AllowPlaintext: true,
 })

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	filesystem "github.com/faustbrian/go-filesystem"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
 	pkgsftp "github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )

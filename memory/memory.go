@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	filesystem "github.com/faustbrian/go-filesystem"
-	"github.com/faustbrian/go-filesystem/internal/streamwriter"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
+	"github.com/faustbrian/go-filesystem/v2/internal/streamwriter"
 )
 
 var capabilities = filesystem.NewCapabilitySet(

@@ -23,8 +23,8 @@ import (
 	"time"
 	"unicode"
 
-	filesystem "github.com/faustbrian/go-filesystem"
-	"github.com/faustbrian/go-filesystem/internal/streamwriter"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
+	"github.com/faustbrian/go-filesystem/v2/internal/streamwriter"
 	pkgsftp "github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -43,6 +43,9 @@ type Config struct {
 	HostKeyCallback ssh.HostKeyCallback
 	// Root is the absolute remote directory containing all logical paths.
 	Root string
+	// AllowUnsafeSubroot permits a Root other than "/". SFTP cannot atomically
+	// reject links and use a path; callers must enforce confinement at the server.
+	AllowUnsafeSubroot bool
 	// Timeout bounds TCP dialing; zero selects 30 seconds. The operation
 	// context's cancellation or deadline bounds SSH setup.
 	Timeout time.Duration
@@ -124,6 +127,9 @@ func Open(ctx context.Context, configuration Config) (*Adapter, error) {
 	root, err := validateRoot(configuration.Root)
 	if err != nil {
 		return nil, err
+	}
+	if root != "/" && !configuration.AllowUnsafeSubroot {
+		return nil, errors.New("sftp: subroot requires explicit unsafe opt-in and server-side isolation")
 	}
 	if configuration.Timeout < 0 {
 		return nil, errors.New("sftp: timeout must not be negative")
