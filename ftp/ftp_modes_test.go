@@ -89,10 +89,12 @@ func startModeServer(t *testing.T, root string, mode TLSMode, tlsConfiguration *
 	if err != nil {
 		t.Fatal(err)
 	}
+	tracked := newLoopbackFTPListener(listener)
+	listener = tracked
 	if mode == TLSImplicit {
 		listener = tls.NewListener(listener, tlsConfiguration)
 	}
-	driver := &loopbackFTPDriver{root: root, listener: listener, mode: mode, tls: tlsConfiguration}
+	driver := &loopbackFTPDriver{root: root, listener: listener, mode: mode, tls: tlsConfiguration, connections: tracked}
 	// Use an independent server: the client's own v1.6.1 server double-cleans
 	// completed transfers and can cancel the next transfer after sending 226.
 	server := protocolserver.NewFtpServer(driver)
@@ -103,27 +105,96 @@ func startModeServer(t *testing.T, root string, mode TLSMode, tlsConfiguration *
 	serveErrors := make(chan error, 1)
 	go func() { serveErrors <- server.Serve() }()
 	t.Cleanup(func() {
-		driver.closeClients()
 		if err := server.Stop(); err != nil {
 			t.Errorf("server Stop() error = %v", err)
 		}
-		if err := <-serveErrors; err != nil {
-			t.Errorf("server Serve() error = %v", err)
+		select {
+		case err := <-serveErrors:
+			if err != nil {
+				t.Errorf("server Serve() error = %v", err)
+			}
+		case <-time.After(time.Second):
+			t.Error("server accept loop did not stop")
+		}
+		tracked.closeConnections()
+		select {
+		case <-tracked.drained:
+		case <-time.After(time.Second):
+			t.Error("server command loops did not stop")
 		}
 	})
 	return listener.Addr().String()
 }
 
-// The fixture owns accepted sessions as well as the control/passive listeners;
-// ftpserverlib.Stop alone closes only listeners, not connected clients.
+// The listener owns physical control sockets, including pre-authentication
+// connections. Closing a raw net.Conn is safe during QUIT; ClientContext.Close
+// would race the protocol handler's unsynchronized disconnect bookkeeping.
+type loopbackFTPListener struct {
+	net.Listener
+	mu           sync.Mutex
+	connections  []net.Conn
+	commandLoops int
+	closed       bool
+	drained      chan struct{}
+}
+
+func newLoopbackFTPListener(listener net.Listener) *loopbackFTPListener {
+	return &loopbackFTPListener{Listener: listener, drained: make(chan struct{})}
+}
+
+func (l *loopbackFTPListener) Accept() (net.Conn, error) {
+	connection, err := l.Listener.Accept()
+	if err == nil {
+		l.mu.Lock()
+		if l.closed {
+			l.mu.Unlock()
+			_ = connection.Close()
+			return nil, net.ErrClosed
+		}
+		l.connections = append(l.connections, connection)
+		l.commandLoops++
+		l.mu.Unlock()
+	}
+	return connection, err
+}
+
+// closeConnections runs after listener shutdown. An already in-flight Accept
+// is rejected if it returns later, so it cannot escape the shutdown snapshot.
+func (l *loopbackFTPListener) closeConnections() {
+	l.mu.Lock()
+	if l.closed {
+		l.mu.Unlock()
+		return
+	}
+	l.closed = true
+	connections := l.connections
+	l.connections = nil
+	if l.commandLoops == 0 {
+		close(l.drained)
+	}
+	l.mu.Unlock()
+	for _, connection := range connections {
+		_ = connection.Close()
+	}
+}
+
+// ClientDisconnected marks command-loop exit. Graceful QUIT also joins the
+// server's transfer workers; the concrete fixtures finish data I/O before quit.
+func (l *loopbackFTPListener) commandLoopDone() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.commandLoops--
+	if l.closed && l.commandLoops == 0 {
+		close(l.drained)
+	}
+}
+
 type loopbackFTPDriver struct {
-	root     string
-	listener net.Listener
-	mode     TLSMode
-	tls      *tls.Config
-	mu       sync.Mutex
-	clients  []protocolserver.ClientContext
-	closed   bool
+	root        string
+	listener    net.Listener
+	mode        TLSMode
+	tls         *tls.Config
+	connections *loopbackFTPListener
 }
 
 func (d *loopbackFTPDriver) GetSettings() (*protocolserver.Settings, error) {
@@ -140,17 +211,13 @@ func (d *loopbackFTPDriver) GetSettings() (*protocolserver.Settings, error) {
 	}, nil
 }
 
-func (d *loopbackFTPDriver) ClientConnected(client protocolserver.ClientContext) (string, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.closed {
-		return "", net.ErrClosed
-	}
-	d.clients = append(d.clients, client)
+func (*loopbackFTPDriver) ClientConnected(protocolserver.ClientContext) (string, error) {
 	return "loopback FTP fixture", nil
 }
 
-func (*loopbackFTPDriver) ClientDisconnected(protocolserver.ClientContext) {}
+func (d *loopbackFTPDriver) ClientDisconnected(protocolserver.ClientContext) {
+	d.connections.commandLoopDone()
+}
 
 func (d *loopbackFTPDriver) AuthUser(_ protocolserver.ClientContext, user, password string) (protocolserver.ClientDriver, error) {
 	if user != "user" || password != "password" {
@@ -160,16 +227,6 @@ func (d *loopbackFTPDriver) AuthUser(_ protocolserver.ClientContext, user, passw
 }
 
 func (d *loopbackFTPDriver) GetTLSConfig() (*tls.Config, error) { return d.tls, nil }
-
-func (d *loopbackFTPDriver) closeClients() {
-	d.mu.Lock()
-	d.closed = true
-	clients := append([]protocolserver.ClientContext(nil), d.clients...)
-	d.mu.Unlock()
-	for _, client := range clients {
-		_ = client.Close()
-	}
-}
 
 func testTLSConfigurations(t *testing.T) (*tls.Config, *tls.Config) {
 	t.Helper()
