@@ -7,7 +7,7 @@ import (
 	"errors"
 	"io"
 
-	filesystem "github.com/faustbrian/go-filesystem"
+	filesystem "github.com/faustbrian/go-filesystem/v2"
 	"github.com/faustbrian/go-tabular"
 )
 

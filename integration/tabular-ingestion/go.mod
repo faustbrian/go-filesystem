@@ -3,7 +3,7 @@ module github.com/faustbrian/go-filesystem/integration/tabular-ingestion
 go 1.27.0
 
 require (
-	github.com/faustbrian/go-filesystem v1.1.0
+	github.com/faustbrian/go-filesystem/v2 v2.0.0
 	github.com/faustbrian/go-tabular v1.0.0
 )
 

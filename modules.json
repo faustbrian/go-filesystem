@@ -330,7 +330,7 @@
       "version": "unreleased",
       "tag_prefix": "integration/tabular-ingestion/v",
       "owned_dependencies": [
-        "github.com/faustbrian/go-filesystem",
+        "github.com/faustbrian/go-filesystem/v2",
         "github.com/faustbrian/go-tabular"
       ],
       "reverse_owned_dependencies": [],
