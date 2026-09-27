@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
-	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -17,47 +16,16 @@ import (
 
 	filesystem "github.com/faustbrian/go-filesystem/v2"
 	"github.com/faustbrian/go-filesystem/v2/fstest"
-	protocolserver "github.com/gonzalop/ftp/server"
 )
 
 var _ func(context.Context, Config) (*Adapter, error) = Open
 
 func TestConcreteClientIntegration(t *testing.T) {
 	root := t.TempDir()
-	driver, err := protocolserver.NewFSDriver(root,
-		protocolserver.WithAuthenticator(func(user, password, _ string, _ net.IP) (string, bool, error) {
-			if user != "user" || password != "password" {
-				return "", false, os.ErrPermission
-			}
-			return root, false, nil
-		}),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	server, err := protocolserver.NewServer(listener.Addr().String(), protocolserver.WithDriver(driver))
-	if err != nil {
-		t.Fatal(err)
-	}
-	serveErrors := make(chan error, 1)
-	go func() { serveErrors <- server.Serve(listener) }()
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		if err := server.Shutdown(ctx); err != nil {
-			t.Errorf("server Shutdown() error = %v", err)
-		}
-		if err := <-serveErrors; err != nil && !errors.Is(err, protocolserver.ErrServerClosed) {
-			t.Errorf("server Serve() error = %v", err)
-		}
-	})
+	address := startModeServer(t, root, TLSPlaintext, nil)
 
 	adapter, err := Open(context.Background(), Config{
-		Address:        listener.Addr().String(),
+		Address:        address,
 		Username:       "user",
 		Password:       "password",
 		TLSMode:        TLSPlaintext,
@@ -133,7 +101,7 @@ func TestConcreteClientIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := New(context.Background(), Config{
-		Address:        listener.Addr().String(),
+		Address:        address,
 		Username:       "user",
 		Password:       "wrong",
 		TLSMode:        TLSPlaintext,

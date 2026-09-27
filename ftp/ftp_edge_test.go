@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -727,6 +728,29 @@ func TestRealSessionMachineAndLegacyListingBranches(t *testing.T) {
 	}
 	if _, err := (&realSession{client: failing}).List("/"); !errors.Is(err, errInjected) {
 		t.Fatalf("List(failure) error = %v", err)
+	}
+}
+
+func TestRealSessionMachineUnavailableRemainsAuthoritative(t *testing.T) {
+	t.Parallel()
+	for _, legacyCode := range []int{450, 0} {
+		t.Run(fmt.Sprintf("legacy/%d", legacyCode), func(t *testing.T) {
+			unavailable := &protocol.ProtocolError{Code: 550}
+			client := &stubProtocolClient{
+				mlStat: func(string) (*protocol.MLEntry, error) { return nil, unavailable },
+				list: func(string) ([]*protocol.Entry, error) {
+					if legacyCode != 0 {
+						return nil, &protocol.ProtocolError{Code: legacyCode}
+					}
+					return []*protocol.Entry{{Name: "missing", Type: "file"}}, nil
+				},
+				modTime: func(string) (time.Time, error) { return fixedTime(), nil },
+			}
+			_, err := (&realSession{client: client, machineListings: true}).Stat("/missing-parent/missing")
+			if !errors.Is(err, unavailable) {
+				t.Fatalf("Stat(machine unavailable) = %v; want original 550", err)
+			}
+		})
 	}
 }
 

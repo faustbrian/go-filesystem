@@ -7,17 +7,18 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"errors"
 	"io"
 	"math/big"
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	filesystem "github.com/faustbrian/go-filesystem/v2"
-	protocolserver "github.com/gonzalop/ftp/server"
+	protocolserver "github.com/fclairamb/ftpserverlib"
+	"github.com/spf13/afero"
 )
 
 func TestConcreteTransportModeMatrix(t *testing.T) {
@@ -84,45 +85,90 @@ func TestFTPSModesAreRejectedBeforeDial(t *testing.T) {
 
 func startModeServer(t *testing.T, root string, mode TLSMode, tlsConfiguration *tls.Config) string {
 	t.Helper()
-	driver, err := protocolserver.NewFSDriver(root,
-		protocolserver.WithAuthenticator(func(user, password, _ string, _ net.IP) (string, bool, error) {
-			if user != "user" || password != "password" {
-				return "", false, os.ErrPermission
-			}
-			return root, false, nil
-		}),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	options := []protocolserver.Option{protocolserver.WithDriver(driver)}
-	if mode != TLSPlaintext {
-		options = append(options, protocolserver.WithTLS(tlsConfiguration))
-	}
-	server, err := protocolserver.NewServer(listener.Addr().String(), options...)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if mode == TLSImplicit {
 		listener = tls.NewListener(listener, tlsConfiguration)
 	}
+	driver := &loopbackFTPDriver{root: root, listener: listener, mode: mode, tls: tlsConfiguration}
+	// Use an independent server: the client's own v1.6.1 server double-cleans
+	// completed transfers and can cancel the next transfer after sending 226.
+	server := protocolserver.NewFtpServer(driver)
+	if err := server.Listen(); err != nil {
+		_ = listener.Close()
+		t.Fatal(err)
+	}
 	serveErrors := make(chan error, 1)
-	go func() { serveErrors <- server.Serve(listener) }()
+	go func() { serveErrors <- server.Serve() }()
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		if err := server.Shutdown(ctx); err != nil {
-			t.Errorf("server Shutdown() error = %v", err)
+		driver.closeClients()
+		if err := server.Stop(); err != nil {
+			t.Errorf("server Stop() error = %v", err)
 		}
-		if err := <-serveErrors; err != nil && !errors.Is(err, protocolserver.ErrServerClosed) {
+		if err := <-serveErrors; err != nil {
 			t.Errorf("server Serve() error = %v", err)
 		}
 	})
 	return listener.Addr().String()
+}
+
+// The fixture owns accepted sessions as well as the control/passive listeners;
+// ftpserverlib.Stop alone closes only listeners, not connected clients.
+type loopbackFTPDriver struct {
+	root     string
+	listener net.Listener
+	mode     TLSMode
+	tls      *tls.Config
+	mu       sync.Mutex
+	clients  []protocolserver.ClientContext
+	closed   bool
+}
+
+func (d *loopbackFTPDriver) GetSettings() (*protocolserver.Settings, error) {
+	requirement := protocolserver.ClearOrEncrypted
+	if d.mode == TLSImplicit {
+		requirement = protocolserver.ImplicitEncryption
+	}
+	if d.mode == TLSExplicit {
+		requirement = protocolserver.MandatoryEncryption
+	}
+	return &protocolserver.Settings{
+		Listener: d.listener, PublicHost: "127.0.0.1", ActiveTransferPortNon20: true,
+		IdleTimeout: 30, ConnectionTimeout: 30, TLSRequired: requirement,
+	}, nil
+}
+
+func (d *loopbackFTPDriver) ClientConnected(client protocolserver.ClientContext) (string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.closed {
+		return "", net.ErrClosed
+	}
+	d.clients = append(d.clients, client)
+	return "loopback FTP fixture", nil
+}
+
+func (*loopbackFTPDriver) ClientDisconnected(protocolserver.ClientContext) {}
+
+func (d *loopbackFTPDriver) AuthUser(_ protocolserver.ClientContext, user, password string) (protocolserver.ClientDriver, error) {
+	if user != "user" || password != "password" {
+		return nil, os.ErrPermission
+	}
+	return afero.NewBasePathFs(afero.NewOsFs(), d.root), nil
+}
+
+func (d *loopbackFTPDriver) GetTLSConfig() (*tls.Config, error) { return d.tls, nil }
+
+func (d *loopbackFTPDriver) closeClients() {
+	d.mu.Lock()
+	d.closed = true
+	clients := append([]protocolserver.ClientContext(nil), d.clients...)
+	d.mu.Unlock()
+	for _, client := range clients {
+		_ = client.Close()
+	}
 }
 
 func testTLSConfigurations(t *testing.T) (*tls.Config, *tls.Config) {

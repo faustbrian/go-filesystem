@@ -5,6 +5,11 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [2.0.0] - 2026-09-27
 
+### Fixed
+
+- Preserve FTP machine-stat file-unavailable replies instead of replacing them
+  with contradictory legacy-listing results or errors.
+
 ### Security
 
 - FTP and SFTP reject non-root remote directories before dialing unless the

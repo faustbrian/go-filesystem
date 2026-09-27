@@ -9,8 +9,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.3.2
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.105.1
 	github.com/aws/smithy-go v1.27.3
+	github.com/fclairamb/ftpserverlib v0.32.4
 	github.com/gonzalop/ftp v1.6.1
 	github.com/pkg/sftp v1.13.11
+	github.com/spf13/afero v1.15.0
 	golang.org/x/crypto v0.56.0
 )
 
@@ -30,4 +32,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.44.1 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 )

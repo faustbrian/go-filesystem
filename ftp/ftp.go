@@ -806,6 +806,11 @@ func (s *realSession) Stat(name string) (remoteEntry, error) {
 		if err == nil {
 			return machineEntry(entry), nil
 		}
+		// A machine-stat file-unavailable reply is authoritative. A legacy
+		// parent listing can replace it with a different error or stale entry.
+		if isNotFound(err) {
+			return remoteEntry{}, err
+		}
 	}
 	parent := path.Dir(name)
 	entries, err := s.client.List(parent)

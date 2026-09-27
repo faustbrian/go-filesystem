@@ -18,7 +18,7 @@ implementation is supplied by the pinned tool.
 | S3 | `s3.TestConformance` | pinned MinIO | pagination, conditional writes, metadata limits, temporary URLs, multipart abort |
 | R2 | shared S3 transport suite | pinned MinIO through `r2.Load` | `auto` region, endpoint validation, R2 profile, multipart abort |
 | SFTP | `sftp.TestConformance` | in-process SSH and SFTP server | host keys, authentication, reconnect, POSIX rename negotiation |
-| FTP | `ftp.TestConformance` | in-process FTP server | passive/active plaintext transfers, reconnect, legacy listings |
+| FTP | `ftp.TestConformance` | independent in-process FTP server | passive/active plaintext transfers, reconnect, legacy listings, authoritative machine-stat errors |
 
 S3 and R2 use separate constructors and integration buckets. The S3 caller
 owns AWS SDK region, credentials, signing, endpoint, retry, and checksum
@@ -31,6 +31,14 @@ FTPS is not listed as an operational boundary. The pinned FTP client cannot
 honor protected data transfers, so explicit and implicit TLS configurations
 fail before dialing. This avoids a connection that appears secure but fails or
 downgrades when the first data channel opens.
+
+Concrete FTP checks use the production `gonzalop/ftp` v1.6.1 client against
+`fclairamb/ftpserverlib` v0.32.4 (MIT) with `afero` v1.15.0 (Apache-2.0) as a
+test-only local filesystem driver. Successive transfers remain on one control
+session. The client's own server implementation is not used: controlled
+previous-transfer close and subsequent-read barriers reproduced its duplicate
+cleanup canceling the next transfer after a successful completion reply.
+The independent server closes the backend file before replying to the transfer.
 
 ## Fault and resource matrix
 
