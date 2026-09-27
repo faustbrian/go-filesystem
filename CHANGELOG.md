@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file. The
 format follows Keep a Changelog and the project uses Semantic Versioning.
 
-## [Unreleased]
+## [2.0.0] - 2026-09-27
 
 ### Security
 
@@ -145,6 +145,6 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
   the pinned protocol client cannot safely complete protected data transfers.
   Plaintext passive and active modes are covered by real transfer tests.
 
-[Unreleased]: https://github.com/faustbrian/go-filesystem/compare/v1.1.0...HEAD
+[2.0.0]: https://github.com/faustbrian/go-filesystem/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/faustbrian/go-filesystem/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/faustbrian/go-filesystem/releases/tag/v1.0.0

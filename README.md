@@ -20,9 +20,11 @@ decorators, and conformance helpers. It does not select an application storage
 policy or erase backend-specific consistency, atomicity, durability,
 permissions, or retry behavior.
 
-The module has a stable v1 API and requires Go 1.27.0 or newer. The latest
-public release is `v1.1.0`, which includes the additive context-aware
-acquisition APIs.
+The v2 source requires Go 1.27.0 or newer. Production code stays at the
+repository root on main; the `/v2` suffix is Go's major-version module identity,
+not a version-specific source directory or branch. The legacy `v1.1.0` release
+introduced additive context-aware acquisition APIs. The installation command
+below requires published v2 artifacts; preparing source does not publish them.
 
 The API is portable Go. The release gate runs on Ubuntu 24.04; the local
 adapter additionally requires a target supported by `os.Root` and retains the
@@ -36,7 +38,8 @@ and [integration and data movement family guidance](https://github.com/faustbria
 ## Installation
 
 ```sh
-go get github.com/faustbrian/go-filesystem/v2@v2
+# After v2.0.0 is published:
+go get github.com/faustbrian/go-filesystem/v2@v2.0.0
 ```
 
 ## Quick start
@@ -238,7 +241,7 @@ include the [API reference](https://pkg.go.dev/github.com/faustbrian/go-filesyst
 
 ## Status
 
-The API is stable at v1. Compatibility commitments and tested service versions
+The source prepares the v2 API. Compatibility commitments and tested services
 are recorded in [COMPATIBILITY.md](COMPATIBILITY.md). Google Cloud Storage and
 Azure Blob Storage are intentionally outside the initial release.
 
