@@ -10,7 +10,7 @@ import (
 
 	filesystem "github.com/faustbrian/go-filesystem/v2"
 	"github.com/faustbrian/go-filesystem/v2/memory"
-	"github.com/faustbrian/go-tabular"
+	"github.com/faustbrian/go-tabular/v2"
 )
 
 func TestIngestCSVStreamsRowsAndClosesAfterConsumption(t *testing.T) {
@@ -39,6 +39,40 @@ func TestIngestCSVStreamsRowsAndClosesAfterConsumption(t *testing.T) {
 	}
 	if source.openCalls != 1 || source.opened.String() != "imports/people.csv" {
 		t.Fatalf("open calls = %d, path = %q", source.openCalls, source.opened.String())
+	}
+}
+
+func TestIngestCSVAcceptsExactPositiveBounds(t *testing.T) {
+	const input = "name\nAda\n"
+	stream := &trackingStream{Reader: strings.NewReader(input)}
+	var rows []tabular.Row
+	err := IngestCSV(context.Background(), &stubFilesystem{stream: stream}, filesystem.MustParsePath("people.csv"), Config{
+		MaxObjectBytes: int64(len(input)),
+		MaxRecordBytes: len("name\n"),
+		MaxFieldBytes:  len("name"),
+		MaxRows:        1,
+	}, func(row tabular.Row) error {
+		rows = append(rows, append(tabular.Row(nil), row...))
+		return nil
+	})
+	if err != nil || fmt.Sprint(rows) != "[[Ada]]" || !stream.closed {
+		t.Fatalf("exact bounds: rows = %v, closed = %t, error = %v", rows, stream.closed, err)
+	}
+}
+
+func TestIngestCSVPreservesCallbackAndCloseFailures(t *testing.T) {
+	callbackErr, closeErr := errors.New("consume row"), errors.New("close source")
+	stream := &trackingStream{
+		Reader:   strings.NewReader("name\nAda\nLinus\n"),
+		closeErr: closeErr,
+	}
+	consumed := 0
+	err := IngestCSV(context.Background(), &stubFilesystem{stream: stream}, filesystem.MustParsePath("people.csv"), testConfig(), func(tabular.Row) error {
+		consumed++
+		return callbackErr
+	})
+	if !errors.Is(err, callbackErr) || !errors.Is(err, closeErr) || consumed != 1 || !stream.closed {
+		t.Fatalf("callback failure: consumed = %d, closed = %t, error = %v", consumed, stream.closed, err)
 	}
 }
 

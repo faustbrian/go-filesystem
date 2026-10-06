@@ -10,7 +10,7 @@ code, not a framework bootstrap or application dependency.
 The verified version set is:
 
 - `github.com/faustbrian/go-filesystem/v2` v2.0.0; and
-- `github.com/faustbrian/go-tabular` v1.0.0.
+- `github.com/faustbrian/go-tabular/v2` v2.0.0.
 
 The application depends on both modules. `filesystem` does not import
 `tabular`, and `tabular` does not import a filesystem adapter. A local, memory,
@@ -24,7 +24,9 @@ construction and credentials remain outside this composition.
 2. `filesystem.Reader.Open` acquires the source stream with the caller's
    context. A successful stream is owned by the composition.
 3. A context-aware total-byte boundary wraps the stream before
-   `tabular.NewCSVReader` applies record and field bounds.
+   `tabular.NewCSVReader` applies record and field bounds. Its source-byte
+   limit uses the same explicit object budget rather than a parser default;
+   the outer boundary retains the application-owned object-limit category.
 4. The parser validates and consumes a required header, then delivers one data
    row at a time to the application callback.
 5. Cancellation is checked before reads and before delivering a buffered row.
