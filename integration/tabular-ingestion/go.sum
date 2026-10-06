@@ -2,8 +2,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/faustbrian/go-filesystem/v2 v2.0.0 h1:Sih3x2czSgo9bXZzQRB4/XQKLfqHP9OQzL40XuPq5pk=
 github.com/faustbrian/go-filesystem/v2 v2.0.0/go.mod h1:DmVh5LonozzE6tKUpk6f5EET6Da1jqhn7NRl4PzKYDA=
-github.com/faustbrian/go-tabular v1.0.0 h1:k+M86Fr01/426Z4bJW2vSnizx5KXK+jxiCNsNcJ8IpE=
-github.com/faustbrian/go-tabular v1.0.0/go.mod h1:XNM1SxRtn0LeasyOh+xJ3iUpjhLcZkTA9ohqJTOM1gw=
+github.com/faustbrian/go-tabular/v2 v2.0.0 h1:WV/ZAUgVMF+hhDlNwXiHKNIsZH/yhdsQyfyy8rGOb/I=
+github.com/faustbrian/go-tabular/v2 v2.0.0/go.mod h1:GR7uPbhK97+3JtGCXTr/hFZ/QScyntIL55cnzJWrGUE=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/richardlehane/mscfb v1.0.7 h1:oeoiM0WE79vHwE8RpIYYvIAc8ajTH2mb6UZm55/+EB0=

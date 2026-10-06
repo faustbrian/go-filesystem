@@ -8,7 +8,7 @@ import (
 	"io"
 
 	filesystem "github.com/faustbrian/go-filesystem/v2"
-	"github.com/faustbrian/go-tabular"
+	"github.com/faustbrian/go-tabular/v2"
 )
 
 var (
@@ -77,6 +77,7 @@ func IngestCSV(
 		tabular.DelimitedConfig{
 			MaxRecordBytes: config.MaxRecordBytes,
 			MaxFieldBytes:  config.MaxFieldBytes,
+			MaxSourceBytes: config.MaxObjectBytes,
 			Header: &tabular.HeaderConfig{
 				TrimSpace:        true,
 				Case:             tabular.HeaderCaseLower,

@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/faustbrian/go-filesystem/v2 v2.0.0
-	github.com/faustbrian/go-tabular v1.0.0
+	github.com/faustbrian/go-tabular/v2 v2.0.0
 )
 
 require (
