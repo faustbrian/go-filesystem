@@ -12,6 +12,12 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
   clock-skew retries and carries stream lengths through request construction;
   retain the existing S3 client and streaming response ownership.
 
+### Fixed
+
+- Select S3 SDK v1.114.1 so received response bodies close when response
+  interceptors reject an operation. Successful S3 and R2 read streams remain
+  caller-owned; the selected SDK includes the upstream cleanup correction.
+
 ## [2.0.0] - 2026-09-27
 
 ### Fixed
