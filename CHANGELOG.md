@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file. The
 format follows Keep a Changelog and the project uses Semantic Versioning.
 
+## [Unreleased]
+
+### Changed
+
+- Adopt AWS SDK core v1.47.1 and Smithy v1.28.1 for S3 and R2.
+  The SDK now uses trusted response-date information when classifying
+  clock-skew retries and carries stream lengths through request construction;
+  retain the existing S3 client and streaming response ownership.
+
 ## [2.0.0] - 2026-09-27
 
 ### Fixed
