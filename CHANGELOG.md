@@ -7,6 +7,11 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ### Changed
 
+- Refresh the AWS transfer manager, configuration and static-credential
+  dependencies while retaining the newer S3 response-cleanup graph. Cover
+  real SDK uploads, multipart publication and aborts, streaming writer
+  failures, and explicit R2 signing through an always-runnable HTTP fixture.
+
 - Adopt AWS SDK core v1.47.1 and Smithy v1.28.1 for S3 and R2.
   The SDK now uses trusted response-date information when classifying
   clock-skew retries and carries stream lengths through request construction;
