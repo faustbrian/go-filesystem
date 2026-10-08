@@ -5,23 +5,38 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-08
+
 ### Changed
 
 - Refresh the AWS transfer manager, configuration and static-credential
   dependencies while retaining the newer S3 response-cleanup graph. Cover
   real SDK uploads, multipart publication and aborts, streaming writer
   failures, and explicit R2 signing through an always-runnable HTTP fixture.
+  Configuration now recognizes `AWS_DISABLE_CLOCK_SKEW_CORRECTION` and its
+  profile equivalent; malformed supplied values can fail R2 configuration
+  loading. Validate explicitly configured values before upgrading.
+  [86d599bf41](https://github.com/faustbrian/go-filesystem/commit/86d599bf4159a8c255e6247e0e6dda8fc5fe1a27)
 
 - Adopt AWS SDK core v1.47.1 and Smithy v1.28.1 for S3 and R2.
   The SDK now uses trusted response-date information when classifying
   clock-skew retries and carries stream lengths through request construction;
   retain the existing S3 client and streaming response ownership.
+  [4cd37d0309](https://github.com/faustbrian/go-filesystem/commit/4cd37d0309b15e92e6b739abd0789ce7bb52ba35)
+- Refresh the internal ingestion harness to published Filesystem and Tabular
+  v2, supplying the parser source-byte budget explicitly.
+  [23dcd54f4d](https://github.com/faustbrian/go-filesystem/commit/23dcd54f4dcc8e66763c03e4d0aa3ff3073e8fba),
+  [60f88d827c](https://github.com/faustbrian/go-filesystem/commit/60f88d827c06a483f6991b6e334f2a86022e30a2)
+- Refresh shared CI enforcement.
+  [9b2ecbd021](https://github.com/faustbrian/go-filesystem/commit/9b2ecbd021152cc6f90c490a131a9b3f4c0d6aef)
 
 ### Fixed
 
 - Select S3 SDK v1.114.1 so received response bodies close when response
   interceptors reject an operation. Successful S3 and R2 read streams remain
   caller-owned; the selected SDK includes the upstream cleanup correction.
+  Strengthen memory snapshot coverage.
+  [cf024b645b](https://github.com/faustbrian/go-filesystem/commit/cf024b645b68145814526648f35bd4b13f0ccd64)
 
 ## [2.0.0] - 2026-09-27
 
