@@ -10,7 +10,7 @@ code, not a framework bootstrap or application dependency.
 The verified version set is:
 
 - `github.com/faustbrian/go-filesystem/v2` v2.0.0; and
-- `github.com/faustbrian/go-tabular/v2` v2.0.0.
+- `github.com/faustbrian/go-tabular/v2` v2.0.2.
 
 The application depends on both modules. `filesystem` does not import
 `tabular`, and `tabular` does not import a filesystem adapter. A local, memory,
