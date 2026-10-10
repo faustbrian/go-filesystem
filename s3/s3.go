@@ -343,8 +343,9 @@ func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options f
 		prefix += "/"
 	}
 	input := &awss3.ListObjectsV2Input{
-		Bucket:  aws.String(a.bucket),
-		Prefix:  optionalString(prefix),
+		Bucket: aws.String(a.bucket),
+		Prefix: optionalString(prefix),
+		// #nosec G115 -- the validated positive list limit is capped at 1000 for the S3 page
 		MaxKeys: aws.Int32(int32(min(limit, 1000))),
 	}
 	if !options.Recursive {
@@ -645,6 +646,7 @@ func paginationComplete(output *awss3.ListObjectsV2Output) bool {
 }
 
 func pageSize(limit, collected int) int32 {
+	// #nosec G115 -- callers have collected < limit; remaining page size is in [1, 1000]
 	return int32(min(limit-collected, 1000))
 }
 

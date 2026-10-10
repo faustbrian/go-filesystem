@@ -5,6 +5,7 @@ package memory
 import (
 	"bytes"
 	"context"
+	// #nosec G501 -- MD5 is an explicitly requested compatibility checksum, never authentication
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
@@ -322,6 +323,7 @@ func (a *Adapter) Checksum(ctx context.Context, path filesystem.Path, algorithm 
 	var value string
 	switch algorithm {
 	case filesystem.ChecksumMD5:
+		// #nosec G401 -- this explicit algorithm-labelled checksum is not a security integrity claim
 		digest := md5.Sum(stored.content)
 		value = hex.EncodeToString(digest[:])
 	case filesystem.ChecksumSHA256:

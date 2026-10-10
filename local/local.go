@@ -4,6 +4,7 @@ package local
 
 import (
 	"context"
+	// #nosec G501 -- MD5 is an explicitly requested compatibility checksum, never authentication
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha256"
@@ -493,6 +494,7 @@ func (a *Adapter) Checksum(ctx context.Context, logicalPath filesystem.Path, alg
 	var value string
 	switch algorithm {
 	case filesystem.ChecksumMD5:
+		// #nosec G401 -- this explicit algorithm-labelled checksum is not a security integrity claim
 		digest := md5.New()
 		if _, err := io.Copy(digest, stream); err != nil {
 			return filesystem.Checksum{}, err

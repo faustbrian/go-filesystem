@@ -4,6 +4,7 @@ package decorator
 
 import (
 	"context"
+	// #nosec G501 -- MD5 is an explicitly requested compatibility checksum, never authentication
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
@@ -321,6 +322,7 @@ func (a *Adapter) Checksum(ctx context.Context, path filesystem.Path, algorithm 
 			var digest hash.Hash
 			switch algorithm {
 			case filesystem.ChecksumMD5:
+				// #nosec G401 -- this explicit algorithm-labelled checksum is not a security integrity claim
 				digest = md5.New()
 			case filesystem.ChecksumSHA256:
 				digest = sha256.New()
