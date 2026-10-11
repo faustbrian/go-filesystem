@@ -37,5 +37,5 @@ points for the single releasable
 
 ## Ecosystem
 
-- [Versioned Golib ecosystem index](https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/README.md)
-- [Integration and Data Movement family](https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/design-language.md#package-families-and-selection)
+- [Versioned Golib ecosystem index](https://github.com/faustbrian/go-library-tools/blob/v2.1.1/docs/ecosystem/README.md)
+- [Integration and Data Movement family](https://github.com/faustbrian/go-library-tools/blob/v2.1.1/docs/ecosystem/design-language.md#package-families-and-selection)

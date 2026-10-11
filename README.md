@@ -3,7 +3,7 @@
 [![CI](https://github.com/faustbrian/go-filesystem/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/faustbrian/go-filesystem/actions/workflows/ci.yml)
 [![CodeQL](https://img.shields.io/badge/CodeQL-required-blue)](https://github.com/faustbrian/go-filesystem/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-100%25_required-blue)](CONTRIBUTING.md#verification)
-[![Mutation](https://img.shields.io/badge/mutation-100%25_required-blue)](CONTRIBUTING.md#verification)
+[![Mutation](https://img.shields.io/badge/mutation-local_and_scheduled-blue)](CONTRIBUTING.md#verification)
 [![Documentation](https://img.shields.io/badge/docs-checked_in_CI-blue)](docs/)
 [![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-filesystem/v2.svg)](https://pkg.go.dev/github.com/faustbrian/go-filesystem/v2)
 [![Release](https://img.shields.io/github/v/release/faustbrian/go-filesystem?sort=semver)](https://github.com/faustbrian/go-filesystem/releases)
@@ -32,8 +32,8 @@ standard library's platform-specific filesystem semantics. Network adapters
 require a reachable compatible service.
 
 For ecosystem-wide package selection and composition guidance, see the
-versioned [Golib ecosystem index](https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/README.md)
-and [integration and data movement family guidance](https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/design-language.md#package-families-and-selection).
+versioned [Golib ecosystem index](https://github.com/faustbrian/go-library-tools/blob/v2.1.1/docs/ecosystem/README.md)
+and [integration and data movement family guidance](https://github.com/faustbrian/go-library-tools/blob/v2.1.1/docs/ecosystem/design-language.md#package-families-and-selection).
 
 ## Installation
 
@@ -248,15 +248,16 @@ Azure Blob Storage are intentionally outside the initial release.
 ## Development
 
 ```sh
-make inventory
-make cohesion
-make repository-check
+GOWORK=off go test ./...
 make check
 make ci
 ```
 
-The shared repository gate compiles documentation examples, checks local and
-external links, and validates the package and module manifests.
+Ordinary tests run deterministic fuzz seeds, not active exploration. The Make
+routes use the pinned public verifier's bounded local checks; `make check-full`
+retains full scheduled/release campaigns. Live S3/R2 conformance needs an
+explicit endpoint. See [contributing](CONTRIBUTING.md#verification) for focused
+fuzzing, optional local mutation and owned ingestion-module qualification.
 
 ## License
 

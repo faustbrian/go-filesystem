@@ -1,10 +1,12 @@
 # Verification matrix
 
 This matrix identifies the executable evidence behind each portability and
-failure guarantee. Unit and in-process integration tests run in `go test
-./...`; the pinned S3-compatible service runs in the integration workflow.
+failure guarantee. Unit and in-process integration tests run in
+`GOWORK=off go test ./...`. Live S3/R2 cases skip unless an S3-compatible
+endpoint is explicitly configured; the current workflow and manifest do not
+provision MinIO.
 
-Local commands and CI use the same strict contract through the v1.4.0
+Local commands and CI use the same strict contract through the v2.1.1
 `go-library-tools` release pinned in `.golib.yaml`. The repository keeps only
 package policy, source-specific evidence, and fixtures; shared gate
 implementation is supplied by the pinned tool.
@@ -15,8 +17,8 @@ implementation is supplied by the pinned tool.
 |---|---|---|---|
 | Memory | `memory.TestConformance` | In-process store | cancellation, metadata copying, concurrent streams |
 | Local | `local.TestConformance` | `os.Root` and host filesystem | symlink-swap containment, permissions, atomic rename cleanup, concurrent readers/writers |
-| S3 | `s3.TestConformance` | pinned MinIO | pagination, conditional writes, metadata limits, temporary URLs, multipart abort |
-| R2 | shared S3 transport suite | pinned MinIO through `r2.Load` | `auto` region, endpoint validation, R2 profile, multipart abort |
+| S3 | `s3.TestConformance` | explicitly configured S3-compatible service | pagination, conditional writes, metadata limits, temporary URLs, multipart abort |
+| R2 | shared S3 transport suite | explicitly configured S3-compatible service through the R2 constructor | `auto` region, endpoint validation, R2 profile, multipart abort |
 | SFTP | `sftp.TestConformance` | in-process SSH and SFTP server | host keys, authentication, reconnect, POSIX rename negotiation |
 | FTP | `ftp.TestConformance` | independent in-process FTP server | passive/active plaintext transfers, reconnect, legacy listings, authoritative machine-stat errors |
 
@@ -61,21 +63,39 @@ bounds can be lowered or raised explicitly; exceeding them returns an error.
 
 ## Required gates
 
-The shared v1 contract runs formatting, static analysis, tests, exact package
-coverage, race checks, the fuzz and benchmark operations declared in
-`.golib.yaml`, security checks, API compatibility, documentation, and
-mutation verification:
+The ordinary contract runs bounded local checks, deterministic tests and fuzz
+seeds/corpora, plus the selected local create-only publication race. It does not
+run full fuzz, benchmark or mutation campaigns:
 
 ```sh
 make check
 ```
 
 Repository structure, manifest, workflow, and shared configuration validation
-run through the complete local contract:
+also run through the bounded local route:
 
 ```sh
 make ci
 ```
 
-The integration workflow additionally starts its pinned MinIO image and runs
-`TestCompatibleServiceConformance` in both `./s3` and `./r2`.
+Changed-source CI adds bounded active smoke for affected fuzz targets. For short
+single-target exploration and optional local mutation, see
+[contributing](../CONTRIBUTING.md#verification). The original seven 10000x fuzz
+budgets (each 20m), local/memory streaming and listing benchmarks (1x/20m),
+full coverage/race, API, security, documentation and mutation checks remain:
+
+```sh
+make check-full
+```
+
+For the separate live boundary, provision a disposable compatible service and
+set `S3_INTEGRATION_ENDPOINT`, `S3_INTEGRATION_ACCESS_KEY` and
+`S3_INTEGRATION_SECRET_KEY` for:
+
+```sh
+GOWORK=off go test -run '^TestCompatibleServiceConformance$' -count=1 -timeout=3m ./s3 ./r2
+```
+
+These tests create and clean their own buckets and objects; they require a
+service and credentials permitting those operations. Neither an unconfigured
+Go run nor the manifest's service-free Make route proves this live boundary.
