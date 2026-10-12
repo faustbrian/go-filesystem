@@ -1,6 +1,9 @@
 // Package ftp provides a capability-based FTP adapter. The external
 // protocol dependency is isolated behind a small session interface so server
-// dialect and reconnect behavior remain explicit.
+// dialect and reconnect behavior remain explicit. Open acquires one control
+// session and Close owns its shutdown. Only explicitly permitted plaintext is
+// operational; TLS modes fail closed. Server namespace isolation is required:
+// separate link preflights do not confine an unsafe client subroot.
 package ftp
 
 import (
@@ -54,7 +57,8 @@ type Config struct {
 	Address string
 	// Username is the FTP login name.
 	Username string
-	// Password is the FTP login secret and is never included in errors.
+	// Password is a retained login secret, not a safe logging/configuration field.
+	// Local validation does not print it; peer/client error text is not universally redacted.
 	Password string
 	// Root is the absolute remote directory containing all logical paths.
 	Root string
@@ -112,7 +116,11 @@ type remoteSession interface {
 type connector func(context.Context) (remoteSession, error)
 
 // Adapter serializes operations over one FTP control session. FTP does not
-// permit independent concurrent commands on a control connection.
+// permit independent concurrent commands on a control connection. A read stream
+// owns the operation lock through transfer completion; callers must read/close
+// it before issuing dependent operations. Lock waits and protocol calls are not
+// all context-interruptible. Credential-bearing connector captures remain owned
+// for reconnect; never treat arbitrary peer errors as sanitized diagnostics.
 type Adapter struct {
 	connector    connector
 	random       io.Reader
@@ -135,7 +143,10 @@ func New(ctx context.Context, configuration Config) (*Adapter, error) {
 	return Open(ctx, configuration)
 }
 
-// Open validates security settings and establishes a caller-owned FTP session.
+// Open rejects nil/canceled contexts and invalid security settings before dialing.
+// Canceling acquisition can return before the protocol goroutine finishes; late
+// successful sessions are cleaned up asynchronously. Timeout is protocol policy,
+// not a guarantee that every blocking callback/cleanup obeys the caller deadline.
 func Open(ctx context.Context, configuration Config) (*Adapter, error) {
 	if ctx == nil {
 		return nil, filesystem.ErrContextRequired
@@ -341,7 +352,9 @@ func (a *Adapter) OpenRange(context.Context, filesystem.Path, filesystem.ByteRan
 }
 
 // Write uploads to a temporary name and renames only when the destination is
-// absent. FTP cannot safely replace an existing destination across servers.
+// absent at precheck. Destination checks and rename are separate protocol calls;
+// no atomic no-clobber or crash-durability claim follows. IfNoneMatch is rejected.
+// A successful rename can precede a failing Stat/cancellation result.
 func (a *Adapter) Write(ctx context.Context, logicalPath filesystem.Path, source io.Reader, options filesystem.WriteOptions) (filesystem.Metadata, error) {
 	if logicalPath.IsRoot() {
 		return filesystem.Metadata{}, fmt.Errorf("%w: object path is root", filesystem.ErrInvalidPath)
@@ -443,8 +456,9 @@ func (a *Adapter) Stat(ctx context.Context, logicalPath filesystem.Path) (filesy
 	return filesystem.Metadata{Path: logicalPath, Kind: kind, Size: entry.Size, Modified: entry.Modified}, nil
 }
 
-// List produces a bounded deterministic snapshot and reconnects once after a
-// control or data connection loss.
+// List collects and sorts a result-capped view and reconnects once after a
+// control or data connection loss. The result cap does not bound an individual
+// upstream directory listing allocation or establish a transactional snapshot.
 func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options filesystem.ListOptions) (filesystem.EntryIterator, error) {
 	if options.Limit < 0 {
 		return nil, errors.New("ftp: list limit must not be negative")
@@ -676,6 +690,8 @@ type readStream struct {
 func (s *readStream) transfer(session remoteSession, writer *io.PipeWriter, logicalPath filesystem.Path) {
 	counting := &countingWriter{writer: writer}
 	err := session.Retrieve(s.adapter.remotePath(logicalPath), counting)
+	// Retrying after any delivered byte would duplicate or mix stream content.
+	// Only a zero-delivered-byte transport failure is eligible for this one replay.
 	if isConnectionError(err) && !counting.wroteAny && s.ctx.Err() == nil {
 		s.adapter.invalidate(session)
 		if reconnected, reconnectErr := s.adapter.currentSession(s.ctx); reconnectErr == nil {

@@ -1,5 +1,8 @@
 // Package decorator provides composable policy wrappers for filesystem
-// adapters without changing their underlying guarantees.
+// adapters without strengthening backend atomicity or durability. New borrows
+// the backend and synchronous callback policies; it owns no backend shutdown.
+// Prefixing is logical mapping, not authorization. Close returned resources;
+// callback panics are not contained, and concurrency needs safe collaborators.
 package decorator
 
 import (
@@ -92,7 +95,9 @@ type RetryPolicy struct {
 }
 
 // WithRetry retries only Open, OpenRange, List, Stat, Checksum, TemporaryURL,
-// and Visibility setup. Mutating operations are never replayed.
+// and Visibility calls. Mutating operations and reads on a returned stream are
+// never replayed. Checksum may include a complete read/Close when WithChecksums
+// is enabled, so a classified read/close failure can restart the whole digest.
 func WithRetry(policy RetryPolicy) Option {
 	return func(configuration *configuration) error {
 		if policy.Attempts <= 0 {
@@ -106,8 +111,10 @@ func WithRetry(policy RetryPolicy) Option {
 	}
 }
 
-// Event describes one decorator operation setup without including object
-// content, credentials, metadata values, or signed URLs.
+// Event describes one observed decorator call without including object
+// content, metadata values or signed URLs as separate fields. Path and raw Error
+// can nevertheless contain sensitive application/peer data; events are not a
+// credential-redaction boundary.
 type Event struct {
 	// Operation identifies the public action.
 	Operation filesystem.Operation
@@ -117,13 +124,16 @@ type Event struct {
 	Destination filesystem.Path
 	// Started is the operation setup start time.
 	Started time.Time
-	// Duration is the elapsed setup time.
+	// Duration covers the observed call but excludes observer callback latency.
+	// Whole Write/Checksum work can be included; returned stream lifetime is not.
 	Duration time.Duration
 	// Error is the returned setup or operation error.
 	Error error
 }
 
-// Observer receives synchronous operation events and must be concurrency-safe.
+// Observer runs synchronously after the operation, must be concurrency-safe,
+// and must return normally. It may delay return or panic after work/resource
+// acquisition; no recovery or automatic cleanup surrounds it.
 type Observer func(Event)
 
 // WithObserver instruments operation setup and completion. Stream lifetime is

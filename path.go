@@ -1,5 +1,14 @@
 // Package filesystem defines capability-based interfaces and shared types for
-// storage adapters.
+// storage adapters. Start with ParsePath and the smallest required capability
+// interfaces; concrete adapters own their containment, buffering and IO semantics.
+// The root uses the standard library and owns no external handles or workers.
+// Successful streams/iterators belong to the caller, and publication errors do
+// not universally imply rollback. Contexts for operations must be non-nil; only
+// named acquisition APIs classify nil as ErrContextRequired.
+//
+// Logical paths are lexical values, not authorization or real-path confinement.
+// Path text, metadata, raw errors and signed URLs can contain sensitive data.
+// Optional providers introduce their own SDK/protocol dependencies.
 package filesystem
 
 import (
@@ -16,8 +25,8 @@ var ErrInvalidPath = errors.New("invalid filesystem path")
 
 // Path is a normalized, root-relative logical filesystem path.
 //
-// Paths always use forward slashes and never contain empty, current-directory,
-// or parent-directory segments.
+// The zero value is Root. Non-root paths always use forward slashes and never
+// contain empty, current-directory, or parent-directory segments.
 type Path struct {
 	value string
 }
@@ -28,7 +37,11 @@ func Root() Path {
 	return Path{}
 }
 
-// ParsePath validates and normalizes a logical filesystem path.
+// ParsePath converts backslashes to slashes, drops leading/repeated slashes and
+// dot segments, and rejects parent segments, controls, UNC and ASCII drive syntax.
+// It does not resolve links, enforce a byte limit, validate all OS names or
+// normalize Unicode. Errors can include the supplied text; do not put secrets
+// in paths. Root is constructed separately rather than parsing empty/dot-only data.
 func ParsePath(value string) (Path, error) {
 	if value == "" {
 		return Path{}, invalidPath(value, "path is empty")
@@ -84,7 +97,7 @@ func (p Path) IsRoot() bool {
 	return p.value == ""
 }
 
-// Base returns the final path segment.
+// Base returns the final path segment, or "." for Root.
 func (p Path) Base() string {
 	return path.Base(p.value)
 }

@@ -5,6 +5,13 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Documentation
+
+- Clarify provider buffering, containment/link limits, publication-error windows,
+  stream close ownership and cancellation boundaries without changing IO behavior.
+- Document checksum retry/observer privacy, local no-clobber move races and
+  memory same-path move behavior rather than implying uniform guarantees.
+
 ## [2.0.1] - 2026-10-08
 
 ### Changed

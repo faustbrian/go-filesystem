@@ -1,6 +1,9 @@
 // Package r2 provides a first-class Cloudflare R2 adapter profile over the S3
 // transport. It exposes R2's configuration and capability differences instead
-// of treating R2 as generic Amazon S3.
+// of treating R2 as generic Amazon S3. Load validates configuration and builds
+// a transport; it does not open a persistent R2 session or own supplied HTTP
+// transport shutdown. SDK concurrency/ownership and publication caveats apply.
+// Config contains raw secrets and is not a redacted logging/serialization value.
 package r2
 
 import (
@@ -51,7 +54,8 @@ type Profile struct {
 	SupportsACL bool
 	// SupportsCopyChecksums reports checksum support on copy operations.
 	SupportsCopyChecksums bool
-	// MultipartRequiresUniformPartSize records R2's multipart constraint.
+	// MultipartRequiresUniformPartSize records R2's service constraint, not
+	// validation of every caller-supplied transfer option.
 	MultipartRequiresUniformPartSize bool
 }
 
@@ -85,8 +89,9 @@ func WithEndpoint(endpoint string) Option {
 	}
 }
 
-// WithDevelopmentEndpoint permits an HTTP endpoint only when it resolves to a
-// loopback literal or localhost. It is intended for local integration tests.
+// WithDevelopmentEndpoint permits HTTP for a loopback literal or localhost
+// hostname spelling. No DNS-resolution or redirect confinement is enforced.
+// It is intended for local integration tests.
 func WithDevelopmentEndpoint(endpoint string) Option {
 	return func(configuration *settings) {
 		configuration.endpoint = endpoint
@@ -94,7 +99,8 @@ func WithDevelopmentEndpoint(endpoint string) Option {
 	}
 }
 
-// WithMaxListEntries bounds one List call. The default is 10,000 entries.
+// WithMaxListEntries bounds returned entries from one List call. The default
+// is 10,000 entries.
 func WithMaxListEntries(limit int) Option {
 	return func(configuration *settings) {
 		configuration.maxListEntries = limit
@@ -111,7 +117,8 @@ func WithMetadataLimits(maxEntries int, maxBytes int64) Option {
 }
 
 // WithTransferOptions customizes the AWS transfer manager. R2 requires
-// multipart parts to use uniform sizes except for the final part.
+// multipart parts to use uniform sizes except for the final part; callers must
+// preserve that requirement because arbitrary supplied options are not validated.
 func WithTransferOptions(options ...func(*transfermanager.Options)) Option {
 	return func(configuration *settings) {
 		configuration.transferOptions = append(configuration.transferOptions, options...)
@@ -302,7 +309,8 @@ func validateLimits(configuration settings) error {
 	return nil
 }
 
-// Profile returns immutable R2-specific transport and semantic guarantees.
+// Profile returns a value copy of configured transport and service expectations,
+// not live conformance evidence or enforcement of arbitrary transfer options.
 func (a *Adapter) Profile() Profile {
 	return a.profile
 }

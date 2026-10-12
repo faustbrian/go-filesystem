@@ -11,6 +11,8 @@ import (
 	"github.com/faustbrian/go-filesystem/v2/memory"
 )
 
+// FuzzMetadataAndListings checks metadata copying and returned listing caps,
+// not a bound on full-object or snapshot working storage.
 func FuzzMetadataAndListings(f *testing.F) {
 	f.Add("object.txt", "key", "value")
 	f.Add("nested/object.txt", "unicode", "雪")
@@ -58,6 +60,8 @@ func FuzzMetadataAndListings(f *testing.F) {
 	})
 }
 
+// BenchmarkStreaming includes a new adapter, whole-object buffering and copied reads
+// for a 1 MiB object per iteration; the reader API is not a memory-bound claim.
 func BenchmarkStreaming(b *testing.B) {
 	payload := strings.Repeat("0123456789abcdef", 64*1024)
 	b.SetBytes(int64(len(payload)))
@@ -86,6 +90,7 @@ func BenchmarkStreaming(b *testing.B) {
 	}
 }
 
+// BenchmarkListing measures sorting and consuming a fixed 1,000-object snapshot.
 func BenchmarkListing(b *testing.B) {
 	adapter := memory.New()
 	for index := 0; index < 1_000; index++ {

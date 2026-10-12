@@ -1,4 +1,7 @@
-// Package fstest provides reusable adapter conformance tests.
+// Package fstest provides selected capability conformance tests and fault seams.
+// Factories own isolated resources and cleanup; passing the portable suite is
+// not live-service qualification, containment, crash-durability or full protocol
+// conformance. TCP proxy helpers start caller-owned listeners/worker goroutines.
 package fstest
 
 import (

@@ -7,6 +7,8 @@ import (
 	filesystem "github.com/faustbrian/go-filesystem/v2"
 )
 
+// FuzzLogicalKeyTranslation checks accepted key normalization and prefix projection,
+// not service authorization or object-list snapshot consistency.
 func FuzzLogicalKeyTranslation(f *testing.F) {
 	for _, seed := range []string{
 		"tenant/object.txt",

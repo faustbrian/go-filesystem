@@ -24,17 +24,18 @@ server feature, and `-` means a typed unsupported-capability error.
 
 | Property | Memory | Local | S3/R2 | SFTP | FTP |
 |---|---|---|---|---|---|
-| Write publication | Atomic under adapter lock | Temporary file plus rename | Object PUT/multipart completion | Temporary file plus rename | Temporary upload plus rename only when destination is absent |
-| Rename | Atomic in process | OS rename beneath root | No rename primitive | Only advertised with `posix-rename@openssh.com` | Not advertised |
+| Write publication | Atomic under adapter lock | Temporary file plus rename/create-only link | Object PUT/multipart completion | Temporary file plus rename | Temporary upload plus rename after an absence precheck |
+| Rename | Locked map update; equal-path overwrite removes the key | OS rename after a racy absence check when overwrite is disabled | No rename primitive | Only advertised with `posix-rename@openssh.com` | Not advertised |
 | Consistency | Immediate | Host filesystem | Service contract | Server filesystem | Server filesystem |
 | Retry policy | None needed | None | AWS SDK read-safe policy | One reconnect for opening read-safe operations | One reconnect for read-safe operations only |
-| Listing bound | Caller limit | Caller limit | Adapter maximum, default 10,000 | Adapter maximum, default 10,000 | Adapter maximum, default 10,000 |
+| Returned listing cap | Caller limit; zero includes all | Caller limit; zero includes all | Adapter maximum, default 10,000 | Adapter maximum, default 10,000 | Adapter maximum, default 10,000 |
 | Metadata bound | Caller-owned | Not supported | 128 entries / 64 KiB default | Not supported | Not supported |
 
 `OpenWriter` sends chunks through a bounded pipe to the adapter's normal
 publication path. `Close` waits for the final sync/upload/rename and returns
 that error; dropping a writer without closing it does not publish a successful
-object and can retain the transfer goroutine until its context is canceled.
+object and can retain the transfer goroutine even after context cancellation.
+Always close an abandoned writer; cancellation does not itself unblock a pipe read.
 
 An adapter may implement a method so a common conformance type can call it
 while still omitting that capability. Such calls always return

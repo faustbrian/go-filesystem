@@ -1,5 +1,8 @@
 // Package redact removes credential-shaped values from errors while retaining
-// their original cause for errors.Is and errors.As.
+// their original cause for errors.Is and errors.As. This is a recognized-pattern
+// Error-string sanitizer, not universal secret detection or safe arbitrary
+// formatting/serialization. Raw causes, URL paths/fragments and unknown patterns
+// can still expose application data; use only bounded trusted diagnostics.
 package redact
 
 import (

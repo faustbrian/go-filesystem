@@ -24,7 +24,9 @@ type FaultReaderOptions struct {
 	CorruptOffsets []int64
 }
 
-// FaultReader models short reads and deterministic mid-stream failures.
+// FaultReader borrows its reader and tracks one unsynchronized byte cursor.
+// It models short reads, corruption and failures; serialize Read calls. Injected
+// latency is a sleep, not context-interruptible cancellation.
 type FaultReader struct {
 	reader    io.Reader
 	maxChunk  int
@@ -35,7 +37,9 @@ type FaultReader struct {
 	corrupt   map[int64]struct{}
 }
 
-// NewFaultReader wraps reader with deterministic read behavior.
+// NewFaultReader borrows reader and copies corruption offsets into a private map.
+// FailAfter zero fails immediately; use a negative value to disable failure.
+// Underlying errors/counts propagate and the wrapper does not close the reader.
 func NewFaultReader(reader io.Reader, options FaultReaderOptions) *FaultReader {
 	injected := options.Err
 	if injected == nil {
@@ -102,7 +106,9 @@ type FaultWriterOptions struct {
 	Latency time.Duration
 }
 
-// FaultWriter models short writes, latency, and deterministic partial failure.
+// FaultWriter borrows its writer and serializes calls with a mutex. Latency and
+// wrapped Write execute under that lock; do not reenter it from the writer.
+// It models short writes and deterministic partial failure, without closing the writer.
 type FaultWriter struct {
 	mu        sync.Mutex
 	writer    io.Writer
@@ -164,7 +170,8 @@ func (w *FaultWriter) Written() int64 {
 }
 
 // FaultIterator is a deterministic listing iterator that can fail after a
-// configured number of entries.
+// configured number of entries. Individual methods are synchronized, but a
+// Next/Entry sequence still needs caller serialization.
 type FaultIterator struct {
 	mu        sync.Mutex
 	entries   []filesystem.Entry
@@ -177,7 +184,7 @@ type FaultIterator struct {
 }
 
 // NewFaultIterator constructs an iterator that reports fault after failAfter
-// entries. A negative failAfter disables failure injection.
+// entries. Inputs are copied; zero fails immediately and negative disables failure.
 func NewFaultIterator(entries []filesystem.Entry, failAfter int, fault error) *FaultIterator {
 	if fault == nil {
 		fault = errors.New("fstest: injected listing failure")

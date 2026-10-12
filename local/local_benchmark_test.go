@@ -9,6 +9,8 @@ import (
 	"github.com/faustbrian/go-filesystem/v2/local"
 )
 
+// BenchmarkLargeObjectStreaming writes then reads 64 MiB with file Sync included;
+// it is not a crash-durability or remote-provider measurement.
 func BenchmarkLargeObjectStreaming(b *testing.B) {
 	const size = int64(64 * 1024 * 1024)
 	adapter, err := local.New(b.TempDir())

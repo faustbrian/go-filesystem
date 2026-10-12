@@ -1,5 +1,8 @@
 // Package sftp provides a capability-based SFTP adapter using pkg/sftp and
-// golang.org/x/crypto/ssh.
+// golang.org/x/crypto/ssh. Open acquires caller-owned sessions; quiesce operations
+// and close streams before Adapter.Close. Host-key policy and server namespace
+// isolation remain caller-owned; link preflight is not atomic path confinement.
+// Remote controls after acquisition have no package-set deadline.
 package sftp
 
 import (
@@ -40,7 +43,8 @@ type Config struct {
 	User string
 	// Auth contains one or more SSH authentication methods.
 	Auth []ssh.AuthMethod
-	// HostKeyCallback verifies the server host key and is mandatory.
+	// HostKeyCallback is mandatory, but the adapter cannot prove it verifies keys.
+	// Supply a trusted verifier; callbacks/authentication referents remain borrowed.
 	HostKeyCallback ssh.HostKeyCallback
 	// Root is the absolute remote directory containing all logical paths.
 	Root string
@@ -79,7 +83,10 @@ type remoteSession interface {
 
 type connector func(context.Context) (remoteSession, error)
 
-// Adapter stores files beneath one remote SFTP directory.
+// Adapter multiplexes a shared SFTP session with synchronized reconnect/closed
+// state. Safe completion requires quiescent Close and caller-owned stream cleanup.
+// Link checks do not stop server-side swaps or confine unsafe subroots; configure
+// account isolation. Capability negotiation is captured at initial acquisition.
 type Adapter struct {
 	connector    connector
 	random       io.Reader
@@ -282,7 +289,9 @@ func (a *Adapter) Open(ctx context.Context, logicalPath filesystem.Path) (io.Rea
 	return newContextReadCloser(ctx, file), nil
 }
 
-// OpenRange opens a bounded range without buffering the whole remote file.
+// OpenRange validates positive representable range syntax and limits reads.
+// It seeks without a file-size precheck, so an offset beyond EOF may yield an
+// empty stream rather than ErrInvalidRange. The caller closes the stream.
 func (a *Adapter) OpenRange(ctx context.Context, logicalPath filesystem.Path, byteRange filesystem.ByteRange) (io.ReadCloser, error) {
 	if !validByteRange(byteRange) {
 		return nil, fmt.Errorf("%w: offset=%d length=%d", filesystem.ErrInvalidRange, byteRange.Offset, byteRange.Length)
@@ -309,7 +318,9 @@ func (a *Adapter) OpenRange(ctx context.Context, logicalPath filesystem.Path, by
 }
 
 // Write publishes through a temporary file. A consumed source is never
-// replayed after connection loss.
+// replayed after connection loss. Sync-unsupported is tolerated, not durable
+// persistence proof. IfNoneMatch is rejected; overwrite uses the negotiated
+// POSIX rename extension, and post-rename Stat/cancellation can fail after publish.
 func (a *Adapter) Write(ctx context.Context, logicalPath filesystem.Path, source io.Reader, options filesystem.WriteOptions) (filesystem.Metadata, error) {
 	if logicalPath.IsRoot() {
 		return filesystem.Metadata{}, fmt.Errorf("%w: object path is root", filesystem.ErrInvalidPath)
@@ -418,8 +429,9 @@ func (a *Adapter) Stat(ctx context.Context, logicalPath filesystem.Path) (filesy
 	return filesystem.Metadata{Path: logicalPath, Kind: kind, Size: info.Size(), Modified: info.ModTime()}, nil
 }
 
-// List returns a bounded deterministic snapshot and reconnects once if the
-// connection is lost while walking.
+// List collects and sorts a result-capped view, reconnecting once on lost
+// connections while walking. Upstream ReadDir allocation is not capped by
+// returned entries; concurrent server changes are not a transactional snapshot.
 func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options filesystem.ListOptions) (filesystem.EntryIterator, error) {
 	if options.Limit < 0 {
 		return nil, errors.New("sftp: list limit must not be negative")

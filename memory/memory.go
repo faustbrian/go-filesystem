@@ -1,5 +1,8 @@
 // Package memory provides a deterministic, concurrency-safe in-memory
-// filesystem adapter intended for tests and ephemeral workloads.
+// filesystem adapter intended for tests and ephemeral workloads. New owns no
+// external resource, but writes and listings may buffer the full object/tree.
+// Read snapshots and metadata copies survive later mutation. Clock callbacks
+// remain caller-owned and must be safe for concurrent, sometimes locked use.
 package memory
 
 import (
@@ -39,7 +42,9 @@ var capabilities = filesystem.NewCapabilitySet(
 // Option configures an Adapter.
 type Option func(*Adapter)
 
-// WithClock replaces the clock used for modification times.
+// WithClock borrows the modification-time callback; nil retains the default.
+// Copy, Move and metadata/visibility updates call it under the write mutex:
+// do not block or reenter this adapter from the callback.
 func WithClock(clock func() time.Time) Option {
 	return func(adapter *Adapter) {
 		if clock != nil {
@@ -48,7 +53,10 @@ func WithClock(clock func() time.Time) Option {
 	}
 }
 
-// Adapter stores objects in memory and is safe for concurrent use.
+// Adapter synchronizes stored objects; concurrency safety also requires a safe
+// clock. Construct with New: zero-value writes cannot initialize its maps.
+// Published content stays immutable, while callers keep input option maps stable
+// until Write or asynchronous OpenWriter completion. Source Read cannot be preempted.
 type Adapter struct {
 	mu      sync.RWMutex
 	objects map[string]object
@@ -96,7 +104,9 @@ func (a *Adapter) Open(ctx context.Context, path filesystem.Path) (io.ReadCloser
 	return io.NopCloser(bytes.NewReader(append([]byte(nil), stored.content...))), nil
 }
 
-// OpenRange returns an independent reader over a bounded object snapshot.
+// OpenRange returns an independent cursor over private immutable stored bytes,
+// without copying the range. Offset at or past EOF is invalid; Length is clamped
+// to available bytes. Successful snapshots do not keep consulting ctx.
 func (a *Adapter) OpenRange(ctx context.Context, path filesystem.Path, byteRange filesystem.ByteRange) (io.ReadCloser, error) {
 	if byteRange.Offset < 0 || byteRange.Length <= 0 {
 		return nil, fmt.Errorf("%w: offset=%d length=%d", filesystem.ErrInvalidRange, byteRange.Offset, byteRange.Length)
@@ -120,7 +130,10 @@ func (a *Adapter) OpenRange(ctx context.Context, path filesystem.Path, byteRange
 	return io.NopCloser(bytes.NewReader(content[byteRange.Offset:end])), nil
 }
 
-// Write consumes source before atomically publishing the object.
+// Write buffers the complete borrowed source before an atomic map publication.
+// IfNoneMatch is checked under the write lock; no universal object-size bound
+// applies. Invalid visibility fails before reading, and cancellation is polled
+// between reads rather than interrupting a blocked source.
 func (a *Adapter) Write(ctx context.Context, path filesystem.Path, source io.Reader, options filesystem.WriteOptions) (filesystem.Metadata, error) {
 	if path.IsRoot() {
 		return filesystem.Metadata{}, fmt.Errorf("%w: object path is root", filesystem.ErrInvalidPath)
@@ -200,7 +213,9 @@ func (a *Adapter) Stat(ctx context.Context, path filesystem.Path) (filesystem.Me
 	return metadataFor(path, stored), nil
 }
 
-// List returns a deterministic snapshot iterator.
+// List snapshots all matching entries under the read lock, then sorts and applies
+// Limit. Zero includes all entries; a positive result cap does not cap snapshot
+// working storage. Keep cursor use serialized; later writes do not alter it.
 func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options filesystem.ListOptions) (filesystem.EntryIterator, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -271,7 +286,9 @@ func (a *Adapter) Copy(ctx context.Context, source, destination filesystem.Path,
 	return nil
 }
 
-// Move atomically renames an object within this adapter.
+// Move updates the map under one mutex. For an existing source, equal paths
+// with Overwrite true assign then delete the same key, removing the object;
+// Overwrite false reports AlreadyExists. Use distinct paths for a preserving rename.
 func (a *Adapter) Move(ctx context.Context, source, destination filesystem.Path, options filesystem.MoveOptions) error {
 	if err := ctx.Err(); err != nil {
 		return err

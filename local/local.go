@@ -1,5 +1,9 @@
 // Package local provides a filesystem adapter contained within a local
-// directory root.
+// directory root. Open acquires a caller-owned os.Root; close streams and stop
+// operations before closing the adapter. The namespace is trusted: root-relative
+// resolution prevents path escape, not preexisting hard-link access or arbitrary
+// file-type hazards. DenySymlinks adds a preflight check, not atomic no-follow.
+// No remote service or cgo integration is introduced by this adapter.
 package local
 
 import (
@@ -118,7 +122,10 @@ func WithSymlinkPolicy(policy SymlinkPolicy) Option {
 }
 
 // Adapter accesses files through an os.Root, which prevents path traversal and
-// symlink escape even when directory entries change concurrently.
+// symlink escape even when directory entries change concurrently. DenySymlinks
+// is checked separately; a swap can still traverse an internal link. Preexisting
+// hard links are not rejected. Keep the root live and quiesce operations/streams
+// before Close; close races are not a guaranteed normal-completion path.
 type Adapter struct {
 	root          rootFS
 	random        io.Reader
@@ -184,7 +191,8 @@ func openAdapter(ctx context.Context, root string, system system, options ...Opt
 	}, nil
 }
 
-// Close releases the root directory handle.
+// Close releases the root directory handle, not a drain of returned streams.
+// Callers stop new operations and close/wait for owned work first.
 func (a *Adapter) Close() error {
 	return a.root.Close()
 }
@@ -235,7 +243,11 @@ func (a *Adapter) OpenRange(ctx context.Context, logicalPath filesystem.Path, by
 	return &limitedReadCloser{Reader: io.LimitReader(stream, byteRange.Length), closer: stream}, nil
 }
 
-// Write atomically replaces a file after the source stream is fully persisted.
+// Write copies source to an exclusive temporary file, Syncs and closes it, then
+// publishes by Rename or create-only Link. Source is borrowed, not closed.
+// Atomic publication is not directory-fsync crash durability. Removing a linked
+// temporary or the subsequent Stat can fail after destination publication.
+// ContentType, Metadata and Visibility do not become local metadata/ACL promises.
 func (a *Adapter) Write(ctx context.Context, logicalPath filesystem.Path, source io.Reader, options filesystem.WriteOptions) (filesystem.Metadata, error) {
 	if logicalPath.IsRoot() {
 		return filesystem.Metadata{}, fmt.Errorf("%w: object path is root", filesystem.ErrInvalidPath)
@@ -286,6 +298,8 @@ func (a *Adapter) Write(ctx context.Context, logicalPath filesystem.Path, source
 	if err := file.Close(); err != nil {
 		return filesystem.Metadata{}, fmt.Errorf("local: close temporary file: %w", err)
 	}
+	// Link publishes an absent destination atomically; the earlier Stat is only
+	// a fast precheck and cannot protect competing creators by itself.
 	if options.IfNoneMatch {
 		if err := a.root.Link(temporary, logicalPath.String()); err != nil {
 			if errors.Is(err, fs.ErrExist) {
@@ -365,7 +379,8 @@ func (a *Adapter) Stat(ctx context.Context, logicalPath filesystem.Path) (filesy
 }
 
 // List walks a directory in deterministic order and stops at the configured
-// limit rather than buffering an unbounded tree.
+// positive result limit. Zero walks the full tree; WalkDir may buffer directory
+// entries before the result cap and the collected data is not a transactional snapshot.
 func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options filesystem.ListOptions) (filesystem.EntryIterator, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -449,7 +464,9 @@ func (a *Adapter) Copy(ctx context.Context, source, destination filesystem.Path,
 	return err
 }
 
-// Move renames a file atomically within the local root.
+// Move uses root-relative Rename after source/link checks and parent creation.
+// Overwrite false checks destination existence separately; a concurrent creator
+// can race that check and be replaced. It is not atomic no-clobber publication.
 func (a *Adapter) Move(ctx context.Context, source, destination filesystem.Path, options filesystem.MoveOptions) error {
 	if err := ctx.Err(); err != nil {
 		return err

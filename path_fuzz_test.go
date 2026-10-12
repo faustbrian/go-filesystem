@@ -7,6 +7,7 @@ import (
 	filesystem "github.com/faustbrian/go-filesystem/v2"
 )
 
+// FuzzParsePath checks accepted lexical normalization and reparsing, not on-disk containment.
 func FuzzParsePath(f *testing.F) {
 	for _, seed := range []string{
 		"",

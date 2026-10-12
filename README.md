@@ -200,8 +200,9 @@ retried blindly.
 
 Invalid paths and resource ceilings support `errors.Is` through package
 sentinels. Unsupported operations return `*filesystem.CapabilityError`;
-backend failures preserve safe causes through wrapping or return a redacted
-backend error. Inspect capabilities before exposing optional behavior.
+backend failures retain wrapped causes or provider-specific redacted error
+text. Raw causes, peer errors and paths are not a universal redaction boundary.
+Inspect capabilities before exposing optional behavior.
 
 Callers must close every successful reader and listing iterator. They must also
 close each streaming writer and check the returned error because final
@@ -213,13 +214,15 @@ and [adapter guide](docs/adapters.md).
 
 ## Design guarantees
 
-- Logical paths are root-relative, slash-separated, and traversal-safe.
-- Reads and writes stream through `io.Reader` and `io.Writer`; whole-object
-  buffering is never part of the root contract.
+- Logical paths are root-relative lexical values, not authorization or
+  link/hard-link confinement.
+- Reads and writes use `io.Reader` and `io.Writer`; this does not guarantee
+  bounded buffering. Memory writes buffer whole objects.
 - Listings are closeable iterators and every network adapter applies a bound.
 - S3/R2 metadata has configurable entry and byte bounds.
-- Remote adapters validate credentials, host identity, transport support, and
-  root settings before use; unsupported FTPS configurations fail before dial.
+- Remote adapters validate configuration and transport support, not the
+  correctness of every supplied credential or host-key verifier. Unsupported
+  FTPS configurations fail before dial.
 - Retry and atomicity behavior is adapter-specific and documented explicitly.
 - `filesystem.NewIOFS` exposes read-only capabilities through standard
   `io/fs` APIs.

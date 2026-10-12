@@ -52,6 +52,8 @@ func TestErrorRedactsMalformedURL(t *testing.T) {
 	}
 }
 
+// FuzzErrorRedaction checks removal of an explicit sentinel from Error text,
+// not arbitrary credential detection or sanitized unwrapped causes.
 func FuzzErrorRedaction(f *testing.F) {
 	for _, seed := range []string{
 		"plain error",

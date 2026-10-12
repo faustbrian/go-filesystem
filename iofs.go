@@ -12,7 +12,11 @@ import (
 )
 
 // IOFS adapts read, stat, and list capabilities to Go's read-only io/fs
-// contracts. Logical directories may be synthesized from object prefixes.
+// contracts. It borrows providers and uses context.Background for operations.
+// Logical directories may be synthesized from prefixes; listings materialize
+// provider results, which may be truncated by a default backend cap. Names follow
+// fs.ValidPath (not ParsePath normalization). Close opened files and serialize
+// directory cursors; stat metadata and later reads are not one atomic snapshot.
 type IOFS struct {
 	reader  Reader
 	statter Statter
@@ -20,7 +24,8 @@ type IOFS struct {
 }
 
 // NewIOFS constructs a read-only io/fs bridge. All three capabilities are
-// required because io/fs directories must support Stat and ReadDir.
+// required because io/fs directories must support Stat and ReadDir. Literal nil
+// capabilities panic; typed-nil implementations remain the caller's responsibility.
 func NewIOFS(reader Reader, statter Statter, lister Lister) *IOFS {
 	if reader == nil || statter == nil || lister == nil {
 		panic("filesystem: NewIOFS requires reader, statter, and lister")

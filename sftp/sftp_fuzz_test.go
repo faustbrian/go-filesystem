@@ -8,6 +8,8 @@ import (
 	filesystem "github.com/faustbrian/go-filesystem/v2"
 )
 
+// FuzzMalformedListingInfo checks fake entry modes and lexical name translation,
+// not live SSH/SFTP conformance or race-free server confinement.
 func FuzzMalformedListingInfo(f *testing.F) {
 	for _, seed := range []string{"object.txt", "directory", "..", "bad\x00name", "slash/name", "雪.txt"} {
 		f.Add(seed, false, false)

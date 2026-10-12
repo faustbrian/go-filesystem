@@ -45,7 +45,8 @@ safe.
 Use `OpenWriter` when content is produced incrementally. Write all chunks and
 then check `Close`: publication errors, including multipart completion or
 temporary-file rename failures, are reported there. Cancel the operation
-context if a producer abandons a writer before close.
+context if abandoning a producer, and still call `Close`: cancellation alone
+may not release a consumer already blocked reading its pipe.
 
 `WriteOptions.IfNoneMatch` expresses create-only publication where supported.
 Do not use it as a distributed lock unless the backend documents the required
@@ -72,7 +73,8 @@ collaborator documents its own synchronization.
 Adapters do not apply a universal retry policy. The AWS SDK owns S3/R2
 transport retries. SFTP and FTP retry only read-safe setup after a confirmed
 connection failure. The optional decorator requires an explicit classifier and
-retries only read-safe operation setup. It never retries a streamed write,
+retries read-safe calls; a computed checksum can restart its full read/close.
+It never retries a streamed write,
 delete, copy, move, or metadata/visibility mutation after an ambiguous response.
 
 Read-after-write and listing consistency belong to the selected backend.

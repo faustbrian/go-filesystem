@@ -1,5 +1,6 @@
 // Package streamwriter adapts a reader-consuming upload into a closeable
-// writer without buffering the whole object.
+// writer with unbuffered pipe backpressure. The consumer may still buffer the
+// whole object. New starts one worker; producer Close supplies EOF and joins it.
 package streamwriter
 
 import (
@@ -18,6 +19,9 @@ type Writer struct {
 
 // New starts consume with the read side of a pipe. Callers must close the
 // returned writer so the consumer can publish or clean up its partial object.
+// consume must be non-nil, return normally, and release its resources; panics
+// are not contained. There is no context watcher to unblock an already waiting
+// pipe Read. Keep callbacks bounded if Close must finish within a deadline.
 func New(consume func(io.Reader) error) *Writer {
 	reader, writer := io.Pipe()
 	done := make(chan error, 1)
@@ -35,7 +39,9 @@ func (w *Writer) Write(content []byte) (int, error) {
 	return w.pipe.Write(content)
 }
 
-// Close signals end of input, waits for publication, and is idempotent.
+// Close signals EOF, joins the consumer and repeats its final result idempotently.
+// Canceling an upload context is not a substitute for Close; a stuck consumer
+// can block Close, and already published backend data cannot be rolled back here.
 func (w *Writer) Close() error {
 	w.once.Do(func() {
 		_ = w.pipe.Close()

@@ -53,16 +53,21 @@ store, err := decorator.New(backend, decorator.WithRetry(decorator.RetryPolicy{
 }))
 ```
 
-Only setup for `Open`, `OpenRange`, `List`, `Stat`, `Checksum`,
-`TemporaryURL`, and `Visibility` is retried. Stream reads after a successful
-open and every mutation are never replayed. Context cancellation and deadlines
-always stop retrying. Classifier and backoff callbacks must be concurrency-safe.
+Calls to `Open`, `OpenRange`, `List`, `Stat`, `Checksum`, `TemporaryURL`,
+and `Visibility` can be retried. Stream reads after a successful open and
+every mutation are never replayed. A retryable `Checksum` failure can restart
+a complete checksum read and close, including `WithChecksums`. Context
+cancellation and deadlines always stop retrying. Classifier and backoff
+callbacks must be concurrency-safe.
 
 ## Instrumentation
 
 `WithObserver` synchronously reports operation, logical paths, start time,
-duration, and returned error. Events never contain content, metadata values,
-credentials, or signed URLs. Open and list events measure setup only; callers
-must instrument stream reads, iterator consumption, and writer `Close`
+duration, and returned error. Events do not add content, metadata values or
+signed URLs as separate fields, but raw errors and logical paths can contain
+sensitive data. They are not a general credential-redaction boundary. Open
+and list events measure setup only; callers must instrument stream reads,
+iterator consumption, and writer `Close`
 separately when full transfer timing is required. Observer callbacks must be
-fast and concurrency-safe.
+fast, concurrency-safe, and return normally: panics are not contained, even
+after completed mutations or resource acquisition.

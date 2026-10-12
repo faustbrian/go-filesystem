@@ -21,7 +21,9 @@ type TCPFaultDirection struct {
 
 // TCPFaultProxyOptions controls client-to-server and server-to-client faults.
 type TCPFaultProxyOptions struct {
+	// ClientToServer applies faults to bytes sent toward the configured upstream.
 	ClientToServer TCPFaultDirection
+	// ServerToClient applies faults to response bytes sent toward the client.
 	ServerToClient TCPFaultDirection
 }
 
@@ -37,7 +39,10 @@ type TCPFaultProxy struct {
 	closeOnce sync.Once
 }
 
-// NewTCPFaultProxy starts a loopback proxy for upstream.
+// NewTCPFaultProxy starts a caller-owned loopback listener and forwarding workers.
+// Options retain CorruptOffsets slices; do not mutate them while the proxy runs.
+// Upstream dialing has no caller context/deadline, and injected latency can delay
+// joined Close. This is a trusted test helper, not a production relay.
 func NewTCPFaultProxy(upstream string, options TCPFaultProxyOptions) (*TCPFaultProxy, error) {
 	if _, _, err := net.SplitHostPort(upstream); err != nil {
 		return nil, errors.New("fstest: TCP fault proxy upstream must include host and port")
@@ -66,7 +71,9 @@ func NewTCPFaultProxy(upstream string, options TCPFaultProxyOptions) (*TCPFaultP
 // Address returns the loopback listener address clients should dial.
 func (p *TCPFaultProxy) Address() string { return p.listener.Addr().String() }
 
-// Close stops accepting connections and closes active proxy streams.
+// Close idempotently stops accepts, closes tracked streams and joins workers.
+// Pending upstream dials and injected sleeps can delay it; no bounded shutdown
+// deadline is provided.
 func (p *TCPFaultProxy) Close() error {
 	var closeErr error
 	p.closeOnce.Do(func() {

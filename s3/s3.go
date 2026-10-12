@@ -1,4 +1,8 @@
-// Package s3 provides an Amazon S3 adapter backed by AWS SDK for Go v2.
+// Package s3 provides an Amazon S3 adapter backed by AWS SDK for Go v2. New
+// borrows the SDK client and creates transfer/presign helpers; applications own
+// transport shutdown, credential policy and option concurrency. Close every
+// returned response body/writer/iterator. No universal object-size, snapshot,
+// multipart-cleanup or cross-provider rename guarantee is introduced.
 package s3
 
 import (
@@ -80,7 +84,8 @@ func WithPrefix(prefix string) Option {
 	}
 }
 
-// WithMaxListEntries bounds one List call. The default is 10,000 entries.
+// WithMaxListEntries bounds returned entries from one List call. The default
+// is 10,000 entries.
 func WithMaxListEntries(limit int) Option {
 	return func(configuration *config) error {
 		if !positiveListLimit(limit) {
@@ -138,6 +143,8 @@ func New(client *awss3.Client, bucket string, options ...Option) (*Adapter, erro
 
 // NewR2Transport constructs the shared S3 transport with R2 semantics. Most
 // callers should use package r2, which validates the R2 endpoint and region.
+// This constructor borrows a preconfigured client; it does not validate its
+// endpoint, region or Cloudflare account identity.
 func NewR2Transport(client *awss3.Client, bucket string, options ...Option) (*Adapter, error) {
 	if client == nil {
 		return nil, errors.New("r2: client is required")
@@ -251,7 +258,10 @@ func (a *Adapter) OpenRange(ctx context.Context, logicalPath filesystem.Path, by
 }
 
 // Write streams source through the AWS transfer manager, which selects a
-// bounded single-part or multipart upload and aborts failed multipart uploads.
+// single-part or multipart upload under caller-configured SDK policy. Cleanup
+// attempts and resource bounds depend on those options; failed aborts are not
+// success. Source is borrowed, option metadata is copied, Visibility is not
+// applied as an ACL, and post-upload cancellation/Stat can fail after publication.
 func (a *Adapter) Write(ctx context.Context, logicalPath filesystem.Path, source io.Reader, options filesystem.WriteOptions) (filesystem.Metadata, error) {
 	if logicalPath.IsRoot() {
 		return filesystem.Metadata{}, fmt.Errorf("%w: object path is root", filesystem.ErrInvalidPath)
@@ -280,7 +290,8 @@ func (a *Adapter) Write(ctx context.Context, logicalPath filesystem.Path, source
 }
 
 // OpenWriter returns a streaming writer that completes its SDK upload on
-// Close and reports upload or multipart-cleanup failures.
+// Close and reports the SDK/write result. Cleanup policy remains SDK-option
+// dependent; Close errors are not proof that no object was published.
 func (a *Adapter) OpenWriter(ctx context.Context, logicalPath filesystem.Path, options filesystem.WriteOptions) (io.WriteCloser, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -327,7 +338,9 @@ func (a *Adapter) Stat(ctx context.Context, logicalPath filesystem.Path) (filesy
 	}, nil
 }
 
-// List retrieves a bounded, deterministic object snapshot.
+// List eagerly collects at most the configured/requested result count and sorts
+// those entries. Service pages are not a transactional snapshot, and their SDK
+// allocation or repeated invalid-key pages are not bounded by returned count.
 func (a *Adapter) List(ctx context.Context, directory filesystem.Path, options filesystem.ListOptions) (filesystem.EntryIterator, error) {
 	if options.Limit < 0 {
 		return nil, errors.New("s3: list limit must not be negative")
@@ -445,7 +458,9 @@ func (a *Adapter) Checksum(context.Context, filesystem.Path, filesystem.Checksum
 	return filesystem.Checksum{}, filesystem.Unsupported(a.adapterName, filesystem.CapabilityChecksum, filesystem.OperationChecksum)
 }
 
-// TemporaryURL creates a presigned GetObject URL valid for at most seven days.
+// TemporaryURL requests a positive signing lifetime of at most seven days.
+// The URL is sensitive bearer data; signing does not establish object access or
+// availability through that lifetime, especially with shorter credential expiry.
 func (a *Adapter) TemporaryURL(ctx context.Context, logicalPath filesystem.Path, lifetime time.Duration, options filesystem.TemporaryURLOptions) (string, error) {
 	if !validTemporaryURLLifetime(lifetime) {
 		return "", fmt.Errorf("s3: temporary URL lifetime must be between 1ns and %s", maximumTemporaryURLLifetime)

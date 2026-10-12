@@ -14,13 +14,13 @@ const (
 	CapabilityWrite Capability = "write"
 	// CapabilityDelete removes objects.
 	CapabilityDelete Capability = "delete"
-	// CapabilityList enumerates bounded directory snapshots.
+	// CapabilityList enumerates entries under provider-specific limits/consistency.
 	CapabilityList Capability = "list"
 	// CapabilityStat retrieves object metadata.
 	CapabilityStat Capability = "stat"
 	// CapabilityCopy copies objects within one adapter.
 	CapabilityCopy Capability = "copy"
-	// CapabilityMove renames or moves objects with documented atomicity.
+	// CapabilityMove moves objects under provider-specific overwrite/atomicity rules.
 	CapabilityMove Capability = "move"
 	// CapabilityRangeRead opens bounded object byte ranges.
 	CapabilityRangeRead Capability = "range-read"
@@ -32,7 +32,7 @@ const (
 	CapabilityTemporaryURL Capability = "temporary-url"
 	// CapabilityVisibility reads and changes coarse object visibility.
 	CapabilityVisibility Capability = "visibility"
-	// CapabilityMultipart uses bounded multipart publication for large writes.
+	// CapabilityMultipart uses multipart publication under provider/SDK policy.
 	CapabilityMultipart Capability = "multipart-upload"
 	// CapabilityStreamingWrite opens incremental io.Writer uploads.
 	CapabilityStreamingWrite Capability = "streaming-write"
@@ -55,7 +55,8 @@ var knownCapabilities = map[Capability]struct{}{
 	CapabilityStreamingWrite: {},
 }
 
-// CapabilitySet is an immutable collection of supported capabilities.
+// CapabilitySet is an immutable collection of supported capabilities. Its zero
+// value is empty; copied sets may share private state safely.
 type CapabilitySet struct {
 	values []Capability
 	index  map[Capability]struct{}
@@ -63,7 +64,7 @@ type CapabilitySet struct {
 
 // NewCapabilitySet constructs a deterministic capability set. It panics for
 // unknown values because advertising an invented capability is a programming
-// error in an adapter.
+// error in an adapter. Inputs are copied and duplicates keep first-declared order.
 func NewCapabilitySet(capabilities ...Capability) CapabilitySet {
 	index := make(map[Capability]struct{}, len(capabilities))
 	values := make([]Capability, 0, len(capabilities))
@@ -94,5 +95,7 @@ func (s CapabilitySet) List() []Capability {
 
 // CapabilityReporter exposes an adapter's supported operations.
 type CapabilityReporter interface {
+	// Capabilities advertises semantic support, not every option combination or
+	// a universal atomicity, buffering or consistency guarantee.
 	Capabilities() CapabilitySet
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/faustbrian/go-filesystem/v2/local"
 )
 
+// FuzzSymlinkContainment checks a stable outside-root symlink; concurrent swaps
+// and hard links are separate partitions, not proved by this corpus.
 func FuzzSymlinkContainment(f *testing.F) {
 	for _, seed := range []string{
 		"secret.txt",

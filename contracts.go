@@ -8,68 +8,99 @@ import (
 
 // Reader opens objects as streams. The caller must close successful results.
 type Reader interface {
+	// Open returns a caller-owned stream on success; always close it.
+	// Cancellation after acquisition and read/close concurrency are provider-specific.
 	Open(context.Context, Path) (io.ReadCloser, error)
 }
 
 // RangeReader opens a bounded region of an object as a stream.
 type RangeReader interface {
+	// OpenRange requires nonnegative Offset and positive Length where supported.
+	// Providers may clamp to EOF, return empty data, or reject an unsatisfiable range;
+	// the caller closes successful streams and checks late read errors.
 	OpenRange(context.Context, Path, ByteRange) (io.ReadCloser, error)
 }
 
-// Writer consumes a stream and does not require the whole object in memory.
+// Writer consumes a stream; providers decide whether to buffer the whole object.
 type Writer interface {
+	// Write borrows source without closing it. Keep option maps stable until return.
+	// Buffering, create-only support, publication and durability differ by provider;
+	// an error (including post-publication Stat) does not prove no object was written.
 	Write(context.Context, Path, io.Reader, WriteOptions) (Metadata, error)
 }
 
 // WriteOpener exposes a streaming writer when a backend can support one
 // without weakening its cleanup or error guarantees.
 type WriteOpener interface {
+	// OpenWriter transfers producer ownership. Close signals EOF and waits for the
+	// final publication result; cancellation alone may not unblock a pipe/source Read.
+	// Close even after cancellation, and keep options/maps valid until completion.
 	OpenWriter(context.Context, Path, WriteOptions) (io.WriteCloser, error)
 }
 
 // Deleter removes an object.
 type Deleter interface {
+	// Delete removes an object under provider-specific absence/idempotency rules.
+	// Do not replay ambiguous remote failures without an application-safe precondition.
 	Delete(context.Context, Path) error
 }
 
-// Lister returns a bounded, closeable iterator over logical entries.
+// Lister returns a closeable iterator over provider-selected logical entries.
 type Lister interface {
+	// List returns a caller-owned iterator; close it on exhaustion and errors.
+	// A result limit need not bound upstream buffering or full snapshot construction.
 	List(context.Context, Path, ListOptions) (EntryIterator, error)
 }
 
 // Statter retrieves object metadata.
 type Statter interface {
+	// Stat returns provider metadata; optional fields may be zero and it is not
+	// a transactional snapshot with a later read or write.
 	Stat(context.Context, Path) (Metadata, error)
 }
 
 // Copier copies an object without implying atomicity.
 type Copier interface {
+	// Copy applies destination options only where supported; unsupported no-clobber
+	// requests must not be assumed to preserve an atomic absence condition.
 	Copy(context.Context, Path, Path, CopyOptions) error
 }
 
 // Mover moves an object according to adapter-specific documented guarantees.
 type Mover interface {
+	// Move has provider-specific rename/overwrite guarantees. Equal paths are not
+	// universally a no-op; memory Move with Overwrite true deletes an existing same key.
 	Move(context.Context, Path, Path, MoveOptions) error
 }
 
 // MetadataSetter replaces user-controlled metadata where supported.
 type MetadataSetter interface {
+	// SetMetadata replaces supported user metadata, borrowing the map until return.
+	// Capability advertisement is required; arbitrary providers may reject it.
 	SetMetadata(context.Context, Path, map[string]string) error
 }
 
 // Checksummer retrieves a backend checksum without assuming algorithms match.
 type Checksummer interface {
+	// Checksum returns the requested supported algorithm, not an ETag inference.
+	// A digest is not authentication or a guarantee against concurrent object changes.
 	Checksum(context.Context, Path, ChecksumAlgorithm) (Checksum, error)
 }
 
 // TemporaryURLer creates a time-limited URL where the backend supports it.
 type TemporaryURLer interface {
+	// TemporaryURL returns sensitive bearer data; keep it out of logs. Requested
+	// lifetime and signing success do not prove access or full-lifetime availability.
 	TemporaryURL(context.Context, Path, time.Duration, TemporaryURLOptions) (string, error)
 }
 
 // VisibilityManager reads and changes coarse object visibility.
 type VisibilityManager interface {
+	// Visibility retrieves supported coarse backend policy, not effective access
+	// under every bucket, account or network authorization rule.
 	Visibility(context.Context, Path) (Visibility, error)
+	// SetVisibility changes supported coarse backend policy; errors and advertised
+	// capabilities do not imply universal ACL support.
 	SetVisibility(context.Context, Path, Visibility) error
 }
 
@@ -98,7 +129,8 @@ type WriteOptions struct {
 type ListOptions struct {
 	// Recursive includes descendants rather than only direct children.
 	Recursive bool
-	// Limit bounds returned entries; zero selects the adapter maximum.
+	// Limit bounds returned entries; zero selects provider defaults. Local and
+	// memory may return all entries, while remote providers have configured caps.
 	Limit int
 }
 
@@ -176,11 +208,17 @@ type Entry struct {
 	Modified time.Time
 }
 
-// EntryIterator permits adapters to page listings without unbounded buffering.
+// EntryIterator supports either paged or materialized listings. It does not
+// guarantee a remote snapshot or bounded provider working storage.
 type EntryIterator interface {
+	// Next advances the cursor and returns false on exhaustion or failure; then inspect Err.
 	Next() bool
+	// Entry exposes the current value; before the first successful Next it may be zero.
 	Entry() Entry
+	// Err reports iteration failure separately from exhaustion. A partial prefix may have been yielded.
 	Err() error
+	// Close releases iterator resources. Providers define idempotency and error behavior;
+	// callers serialize cursor access unless an implementation says otherwise.
 	Close() error
 }
 

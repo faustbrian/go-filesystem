@@ -7,6 +7,8 @@ import (
 	filesystem "github.com/faustbrian/go-filesystem/v2"
 )
 
+// FuzzMalformedListingEntry checks lexical listing-name translation with a fake session,
+// not live protocol decoding or race-free server confinement.
 func FuzzMalformedListingEntry(f *testing.F) {
 	for _, seed := range []string{"object.txt", "directory", "..", "bad\x00name", "slash/name", "雪.txt"} {
 		f.Add(seed, false, false)

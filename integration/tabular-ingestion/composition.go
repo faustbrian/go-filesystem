@@ -26,7 +26,8 @@ var (
 // Config makes every retained-input bound explicit. IngestCSV treats the
 // first record as a required, nonempty, unique header and does not retain it.
 type Config struct {
-	// MaxObjectBytes bounds all bytes read from the opened object.
+	// MaxObjectBytes bounds accepted object bytes; rejecting overflow may read
+	// one extra underlying byte to distinguish it from EOF.
 	MaxObjectBytes int64
 	// MaxRecordBytes bounds one logical CSV record before parser allocation.
 	MaxRecordBytes int
@@ -45,6 +46,12 @@ type Config struct {
 // It is then closed before IngestCSV returns. A close error is joined with any
 // earlier failure so neither outcome is lost. The tabular reader borrows the
 // stream and owns no separately closeable resource.
+//
+// Header names are trimmed/lowercased by tabular; callback rows are delivered
+// synchronously and prior callback side effects are not rolled back on failure.
+// Cancellation checks cannot preempt a blocked source read or callback. The total
+// byte boundary may consume one extra underlying byte to distinguish EOF from
+// an oversized object. No services or local dependency replacements are owned.
 func IngestCSV(
 	ctx context.Context,
 	source filesystem.Reader,

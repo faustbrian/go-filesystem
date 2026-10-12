@@ -4,7 +4,8 @@
 
 Use `memory.New()` for deterministic tests and ephemeral data. It is safe for
 concurrent use and returns immutable read snapshots. `memory.WithClock` makes
-timestamps deterministic.
+timestamps deterministic. The callback must be concurrency-safe and must not
+reenter the adapter: some operations call it under the write lock.
 
 ```go
 store := memory.New()
@@ -14,7 +15,8 @@ store := memory.New()
 
 Call `local.Open(ctx, root)` and close the returned adapter. A nil or already
 canceled context fails before options are applied or the host filesystem is
-accessed. The default policy rejects symbolic links and creates
+accessed. The default policy checks for symbolic links before use; it is not
+an atomic no-follow policy under concurrent swaps. The adapter creates
 files/directories with `0600`/`0700` permissions.
 `local.AllowInternalSymlinks` permits links only when the opened root can still
 contain the operation. Never derive `root` from an untrusted request. The
