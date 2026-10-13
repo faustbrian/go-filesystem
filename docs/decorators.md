@@ -1,5 +1,7 @@
 # Decorator guide
 
+[Documentation index](README.md) · [Repository entry](../README.md)
+
 The `decorator` package composes optional policies around any initial adapter.
 It preserves the backend capability set unless an option explicitly removes or
 adds a guarantee.
@@ -71,3 +73,6 @@ iterator consumption, and writer `Close`
 separately when full transfer timing is required. Observer callbacks must be
 fast, concurrency-safe, and return normally: panics are not contained, even
 after completed mutations or resource acquisition.
+
+Choose the next guide in the [documentation index](README.md)
+or return to the [repository entry](../README.md) for installation and ownership.

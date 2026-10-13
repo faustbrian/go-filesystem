@@ -1,5 +1,7 @@
 # Verification matrix
 
+[Documentation index](README.md) · [Repository entry](../README.md)
+
 This matrix identifies the executable evidence behind each portability and
 failure guarantee. Unit and in-process integration tests run in
 `GOWORK=off go test ./...`. Live S3/R2 cases skip unless an S3-compatible
@@ -99,3 +101,6 @@ GOWORK=off go test -run '^TestCompatibleServiceConformance$' -count=1 -timeout=3
 These tests create and clean their own buckets and objects; they require a
 service and credentials permitting those operations. Neither an unconfigured
 Go run nor the manifest's service-free Make route proves this live boundary.
+
+Choose the next guide in the [documentation index](README.md)
+or return to the [repository entry](../README.md) for installation and ownership.

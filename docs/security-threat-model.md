@@ -1,5 +1,7 @@
 # Remote filesystem confinement threat model
 
+[Documentation index](README.md) · [Repository entry](../README.md)
+
 This model covers FTP/SFTP path confinement in v2. It is not a claim that all
 filesystem or ecosystem security criteria have been verified.
 
@@ -45,3 +47,6 @@ server-side resolution after preflight and observes outside content, proving
 why a client check cannot substitute for the server boundary. Concrete
 loopback transfer/conformance tests cover each pinned protocol client; the
 SFTP fixture's explicit unsafe root has no untrusted concurrent path writers.
+
+Choose the next guide in the [documentation index](README.md)
+or return to the [repository entry](../README.md) for installation and ownership.

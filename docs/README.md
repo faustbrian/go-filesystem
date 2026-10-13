@@ -1,5 +1,7 @@
 # Documentation
 
+[Repository entry](../README.md) · [Versioned ecosystem](https://github.com/faustbrian/go-library-tools/blob/v2.1.1/docs/ecosystem/README.md)
+
 The root [README](../README.md) contains installation, the compiler-checked
 quick start, package selection, construction, lifecycle, and ecosystem entry
 points for the single releasable
@@ -39,3 +41,14 @@ points for the single releasable
 
 - [Versioned Golib ecosystem index](https://github.com/faustbrian/go-library-tools/blob/v2.1.1/docs/ecosystem/README.md)
 - [Integration and Data Movement family](https://github.com/faustbrian/go-library-tools/blob/v2.1.1/docs/ecosystem/design-language.md#package-families-and-selection)
+
+## Complete documentation map
+
+- [Adapter adoption guide](adapters.md) — `docs/adapters.md`
+- [Capability and guarantee matrix](capabilities.md) — `docs/capabilities.md`
+- [Decorator guide](decorators.md) — `docs/decorators.md`
+- [Operations guide](operations.md) — `docs/operations.md`
+- [Package map](package-map.md) — `docs/package-map.md`
+- [Remote filesystem confinement threat model](security-threat-model.md) — `docs/security-threat-model.md`
+- [Source documentation audit](source-documentation-audit.md) — `docs/source-documentation-audit.md`
+- [Verification matrix](verification.md) — `docs/verification.md`

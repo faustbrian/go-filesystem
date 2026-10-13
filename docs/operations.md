@@ -1,5 +1,7 @@
 # Operations guide
 
+[Documentation index](README.md) · [Repository entry](../README.md)
+
 ## Credentials
 
 Use workload identity or secret stores. Scope object credentials to the
@@ -123,3 +125,6 @@ Starting the proxy opens a listener and worker goroutines; the caller must
 close it to terminate the listener and active connections and wait for its
 workers. The memory adapter is appropriate for domain tests only when the
 domain does not depend on a weaker backend guarantee.
+
+Choose the next guide in the [documentation index](README.md)
+or return to the [repository entry](../README.md) for installation and ownership.

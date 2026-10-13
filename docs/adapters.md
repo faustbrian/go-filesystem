@@ -1,5 +1,7 @@
 # Adapter adoption guide
 
+[Documentation index](README.md) · [Repository entry](../README.md)
+
 ## Memory
 
 Use `memory.New()` for deterministic tests and ephemeral data. It is safe for
@@ -146,3 +148,6 @@ their acquired resources; callers must use their immediate `Close` methods. An
 HTTP client supplied to R2 is borrowed and remains caller-owned. The deprecated
 `local.New`, `ftp.New`, `sftp.New`, and `r2.New` functions delegate to these
 replacements for source compatibility.
+
+Choose the next guide in the [documentation index](README.md)
+or return to the [repository entry](../README.md) for installation and ownership.

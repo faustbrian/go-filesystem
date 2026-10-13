@@ -1,5 +1,7 @@
 # Capability and guarantee matrix
 
+[Documentation index](README.md) · [Repository entry](../README.md)
+
 Capabilities report operations that an adapter can provide without hiding
 unsafe emulation. `S` means supported, `C` means conditional on a negotiated
 server feature, and `-` means a typed unsupported-capability error.
@@ -48,3 +50,6 @@ and keeps its documented multipart constraints explicit.
 FTP capabilities apply only to explicitly opted-in plaintext transport.
 Explicit and implicit TLS configurations fail before dialing because the
 pinned client cannot currently prove protected data-transfer behavior.
+
+Choose the next guide in the [documentation index](README.md)
+or return to the [repository entry](../README.md) for installation and ownership.
