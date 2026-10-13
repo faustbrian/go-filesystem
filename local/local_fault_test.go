@@ -50,23 +50,24 @@ func (s *trackingSystem) OpenRoot(string) (rootFS, error) {
 }
 
 type fakeRoot struct {
-	openFile   localFile
-	openErr    error
-	create     localFile
-	createErr  error
-	statInfo   fs.FileInfo
-	statErr    error
-	lstatInfo  fs.FileInfo
-	lstatErr   error
-	mkdirErr   error
-	removeErr  error
-	linkErr    error
-	renameErr  error
-	fsys       fs.FS
-	closeErr   error
-	closeCalls int
-	openFlags  int
-	openMode   fs.FileMode
+	openFile           localFile
+	openErr            error
+	create             localFile
+	createErr          error
+	statInfo           fs.FileInfo
+	statErr            error
+	lstatInfo          fs.FileInfo
+	lstatErr           error
+	mkdirErr           error
+	removeErr          error
+	linkErr            error
+	renameErr          error
+	exclusiveRenameErr error
+	fsys               fs.FS
+	closeErr           error
+	closeCalls         int
+	openFlags          int
+	openMode           fs.FileMode
 }
 
 func (r *fakeRoot) Open(string) (localFile, error) { return r.openFile, r.openErr }
@@ -75,13 +76,14 @@ func (r *fakeRoot) OpenFile(_ string, flags int, mode fs.FileMode) (localFile, e
 	r.openMode = mode
 	return r.create, r.createErr
 }
-func (r *fakeRoot) Stat(string) (fs.FileInfo, error)   { return r.statInfo, r.statErr }
-func (r *fakeRoot) Lstat(string) (fs.FileInfo, error)  { return r.lstatInfo, r.lstatErr }
-func (r *fakeRoot) MkdirAll(string, fs.FileMode) error { return r.mkdirErr }
-func (r *fakeRoot) Remove(string) error                { return r.removeErr }
-func (r *fakeRoot) Link(string, string) error          { return r.linkErr }
-func (r *fakeRoot) Rename(string, string) error        { return r.renameErr }
-func (r *fakeRoot) FS() fs.FS                          { return r.fsys }
+func (r *fakeRoot) Stat(string) (fs.FileInfo, error)     { return r.statInfo, r.statErr }
+func (r *fakeRoot) Lstat(string) (fs.FileInfo, error)    { return r.lstatInfo, r.lstatErr }
+func (r *fakeRoot) MkdirAll(string, fs.FileMode) error   { return r.mkdirErr }
+func (r *fakeRoot) Remove(string) error                  { return r.removeErr }
+func (r *fakeRoot) Link(string, string) error            { return r.linkErr }
+func (r *fakeRoot) Rename(string, string) error          { return r.renameErr }
+func (r *fakeRoot) RenameNoReplace(string, string) error { return r.exclusiveRenameErr }
+func (r *fakeRoot) FS() fs.FS                            { return r.fsys }
 func (r *fakeRoot) Close() error {
 	r.closeCalls++
 	return r.closeErr
@@ -409,7 +411,7 @@ func TestCopyAndMoveInjectedFailures(t *testing.T) {
 	for _, root := range []*fakeRoot{
 		{statErr: errInjected},
 		{statErr: fs.ErrNotExist, mkdirErr: errInjected},
-		{statErr: fs.ErrNotExist, renameErr: errInjected},
+		{statErr: fs.ErrNotExist, exclusiveRenameErr: errInjected},
 	} {
 		if err := fakeAdapter(root).Move(context.Background(), source, destination, filesystem.MoveOptions{}); !errors.Is(err, errInjected) {
 			t.Fatalf("Move() error = %v", err)

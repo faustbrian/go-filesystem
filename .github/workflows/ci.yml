@@ -28,14 +28,66 @@ jobs:
       public_dependencies: true
       release_dry_run: ${{ inputs.release_dry_run || false }}
 
+  native-move:
+    name: Native exclusive Move (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2025]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+          cache: false
+      - name: Exercise native Move and clean owned resources
+        shell: pwsh
+        env:
+          GOWORK: 'off'
+          GOTOOLCHAIN: local
+          GOMAXPROCS: '2'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $task = Join-Path $env:RUNNER_TEMP ('filesystem-native-' + [Guid]::NewGuid().ToString('N'))
+          try {
+            New-Item -ItemType Directory -Path $task | Out-Null
+            foreach ($name in @('cache', 'mod', 'tmp')) {
+              New-Item -ItemType Directory -Path (Join-Path $task $name) | Out-Null
+            }
+            $env:GOCACHE = Join-Path $task 'cache'
+            $env:GOMODCACHE = Join-Path $task 'mod'
+            $env:GOTMPDIR = Join-Path $task 'tmp'
+            go test -p 2 ./local -run '^TestMove' -count=1 -timeout=2m
+            if ($LASTEXITCODE -ne 0) { throw "Native Move tests failed: $LASTEXITCODE" }
+          } finally {
+            if (Test-Path -LiteralPath $task) {
+              if (-not $IsWindows) {
+                # Go module caches contain read-only directories as well as files.
+                & chmod -R u+w $task
+                if ($LASTEXITCODE -ne 0) { throw 'Native Move permission cleanup failed' }
+              }
+              Remove-Item -LiteralPath $task -Recurse -Force -ErrorAction Stop
+            }
+            if (Test-Path -LiteralPath $task) { throw 'Native Move resource cleanup failed' }
+          }
+
   required:
     name: Required
     if: always()
-    needs: ci
+    needs: [ci, native-move]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Require shared workflow
+      - name: Require shared and native workflows
         env:
           CI_RESULT: ${{ needs.ci.result }}
-        run: test "${CI_RESULT}" = success
+          NATIVE_RESULT: ${{ needs.native-move.result }}
+        run: |
+          test "${CI_RESULT}" = success
+          test "${NATIVE_RESULT}" = success

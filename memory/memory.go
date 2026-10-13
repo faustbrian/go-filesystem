@@ -171,7 +171,7 @@ func (a *Adapter) Write(ctx context.Context, path filesystem.Path, source io.Rea
 }
 
 // OpenWriter returns a streaming writer that publishes through Write on
-// Close. Abandoning it without closing leaves the publication incomplete.
+// Close. Cancellation releases its owned pipe; Close still joins cleanup.
 func (a *Adapter) OpenWriter(ctx context.Context, path filesystem.Path, options filesystem.WriteOptions) (io.WriteCloser, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -179,7 +179,7 @@ func (a *Adapter) OpenWriter(ctx context.Context, path filesystem.Path, options 
 	if path.IsRoot() {
 		return nil, fmt.Errorf("%w: object path is root", filesystem.ErrInvalidPath)
 	}
-	return streamwriter.New(func(source io.Reader) error {
+	return streamwriter.New(ctx, func(source io.Reader) error {
 		_, err := a.Write(ctx, path, source, options)
 		return err
 	}), nil
@@ -286,9 +286,9 @@ func (a *Adapter) Copy(ctx context.Context, source, destination filesystem.Path,
 	return nil
 }
 
-// Move updates the map under one mutex. For an existing source, equal paths
-// with Overwrite true assign then delete the same key, removing the object;
-// Overwrite false reports AlreadyExists. Use distinct paths for a preserving rename.
+// Move updates the map under one mutex. Equal paths with Overwrite true are
+// a no-op for an existing source, preserving content, metadata and timestamps;
+// Overwrite false reports AlreadyExists, and absent sources report NotFound.
 func (a *Adapter) Move(ctx context.Context, source, destination filesystem.Path, options filesystem.MoveOptions) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -302,6 +302,9 @@ func (a *Adapter) Move(ctx context.Context, source, destination filesystem.Path,
 	_, exists := a.objects[destination.String()]
 	if !options.Overwrite && exists {
 		return fmt.Errorf("%w: %s", filesystem.ErrAlreadyExists, destination)
+	}
+	if source == destination {
+		return nil
 	}
 	stored.modified = a.clock()
 	a.objects[destination.String()] = stored

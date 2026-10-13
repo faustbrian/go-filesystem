@@ -6,7 +6,9 @@
 
 Use `memory.New()` for deterministic tests and ephemeral data. It is safe for
 concurrent use and returns immutable read snapshots. `memory.WithClock` makes
-timestamps deterministic. The callback must be concurrency-safe and must not
+timestamps deterministic. Equal-path `Move` with overwrite enabled is a no-op
+that preserves bytes, metadata and timestamps; without overwrite it reports
+`ErrAlreadyExists`. Missing sources still report `ErrNotFound`. The callback must be concurrency-safe and must not
 reenter the adapter: some operations call it under the write lock.
 
 ```go
@@ -24,6 +26,16 @@ files/directories with `0600`/`0700` permissions.
 contain the operation. Never derive `root` from an untrusted request. The
 deprecated `local.New` compatibility function delegates with
 `context.Background()`.
+
+Local `Move` with overwrite disabled uses a single native exclusive rename on
+Linux, macOS and Windows. It preserves a competing destination, concurrent
+source replacements, directories and admitted symlink entries. Cross-filesystem
+moves fail without a copy/delete fallback. Other targets, or a kernel/filesystem
+that cannot provide exclusive rename, fail closed with `ErrUnsupportedCapability`
+or the native filesystem error rather than silently enabling replacement. Capability advertisement does not promise
+support for every Move option; handle this option-specific error before offering
+no-overwrite movement. Overwrite-enabled moves still use `os.Root.Rename` on
+all supported targets. Existing symlink-policy and root-containment limits apply.
 
 ```go
 store, err := local.Open(ctx, "/var/lib/application/files")

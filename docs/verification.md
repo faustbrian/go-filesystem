@@ -104,3 +104,13 @@ Go run nor the manifest's service-free Make route proves this live boundary.
 
 Choose the next guide in the [documentation index](README.md)
 or return to the [repository entry](../README.md) for installation and ownership.
+
+## Native exclusive Move qualification
+
+The root CI additionally runs bounded real local-provider `TestMove*` regressions
+on macOS and Windows with Go 1.27.2; its Required result requires both native
+jobs and the existing shared CI to succeed. Ubuntu shared module tests exercise
+the Linux implementation. These checks cover competing destinations, source
+generations, directories, symlink entries, containment and unavailable-operation
+failures. Cross-compilation alone is not native filesystem qualification. Other
+platforms explicitly reject no-overwrite movement without an exclusive primitive.

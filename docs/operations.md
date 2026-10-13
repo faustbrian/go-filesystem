@@ -47,8 +47,12 @@ safe.
 Use `OpenWriter` when content is produced incrementally. Write all chunks and
 then check `Close`: publication errors, including multipart completion or
 temporary-file rename failures, are reported there. Cancel the operation
-context if abandoning a producer, and still call `Close`: cancellation alone
-may not release a consumer already blocked reading its pipe.
+context if abandoning a producer, and still call `Close`: cancellation releases
+the adapter-owned pipe, while `Close` joins publication and cleanup. Borrowed
+`Write` sources are not closed or read in detached goroutines. A blocked caller
+source or callback must return cooperatively; contexts cannot force it to finish.
+Memory mutex acquisition and borrowed clock hooks are likewise not preempted;
+cancellation polling is not a transactional no-publication guarantee.
 
 `WriteOptions.IfNoneMatch` expresses create-only publication where supported.
 Do not use it as a distributed lock unless the backend documents the required

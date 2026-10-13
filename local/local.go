@@ -79,6 +79,7 @@ type rootFS interface {
 	Remove(string) error
 	Link(string, string) error
 	Rename(string, string) error
+	RenameNoReplace(string, string) error
 	FS() fs.FS
 	Close() error
 }
@@ -330,7 +331,7 @@ func (a *Adapter) OpenWriter(ctx context.Context, logicalPath filesystem.Path, o
 	if logicalPath.IsRoot() {
 		return nil, fmt.Errorf("%w: object path is root", filesystem.ErrInvalidPath)
 	}
-	return streamwriter.New(func(source io.Reader) error {
+	return streamwriter.New(ctx, func(source io.Reader) error {
 		_, err := a.Write(ctx, logicalPath, source, options)
 		return err
 	}), nil
@@ -464,9 +465,12 @@ func (a *Adapter) Copy(ctx context.Context, source, destination filesystem.Path,
 	return err
 }
 
-// Move uses root-relative Rename after source/link checks and parent creation.
-// Overwrite false checks destination existence separately; a concurrent creator
-// can race that check and be replaced. It is not atomic no-clobber publication.
+// Move uses a root-contained native exclusive rename when overwrite is disabled,
+// preserving existing destinations and concurrent source replacements atomically.
+// Files, directories and admitted symlink entries retain rename semantics. Platforms
+// without an exclusive primitive fail closed with Unsupported; native filesystem
+// errors are returned without a non-atomic fallback.
+// Overwrite-enabled movement continues to use os.Root.Rename.
 func (a *Adapter) Move(ctx context.Context, source, destination filesystem.Path, options filesystem.MoveOptions) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -479,7 +483,7 @@ func (a *Adapter) Move(ctx context.Context, source, destination filesystem.Path,
 	}
 	if !options.Overwrite {
 		if _, err := a.root.Stat(destination.String()); err == nil {
-			return fmt.Errorf("%w: %s", filesystem.ErrAlreadyExists, destination)
+			return fmt.Errorf("%w: %s: %w", filesystem.ErrAlreadyExists, destination, fs.ErrExist)
 		} else if !errors.Is(err, fs.ErrNotExist) {
 			return mapError(destination, err)
 		}
@@ -488,6 +492,15 @@ func (a *Adapter) Move(ctx context.Context, source, destination filesystem.Path,
 		if err := a.root.MkdirAll(directory, a.directoryMode); err != nil {
 			return err
 		}
+	}
+	if !options.Overwrite {
+		if err := a.root.RenameNoReplace(source.String(), destination.String()); err != nil {
+			if errors.Is(err, fs.ErrExist) {
+				return fmt.Errorf("%w: %s: %w", filesystem.ErrAlreadyExists, destination, err)
+			}
+			return mapError(source, err)
+		}
+		return nil
 	}
 	if err := a.root.Rename(source.String(), destination.String()); err != nil {
 		return mapError(source, err)

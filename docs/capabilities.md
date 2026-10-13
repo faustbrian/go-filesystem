@@ -27,17 +27,26 @@ server feature, and `-` means a typed unsupported-capability error.
 | Property | Memory | Local | S3/R2 | SFTP | FTP |
 |---|---|---|---|---|---|
 | Write publication | Atomic under adapter lock | Temporary file plus rename/create-only link | Object PUT/multipart completion | Temporary file plus rename | Temporary upload plus rename after an absence precheck |
-| Rename | Locked map update; equal-path overwrite removes the key | OS rename after a racy absence check when overwrite is disabled | No rename primitive | Only advertised with `posix-rename@openssh.com` | Not advertised |
+| Rename | Locked map update; equal-path overwrite is a no-op | OS rename; native exclusive rename without overwrite where available | No rename primitive | Only advertised with `posix-rename@openssh.com` | Not advertised |
 | Consistency | Immediate | Host filesystem | Service contract | Server filesystem | Server filesystem |
 | Retry policy | None needed | None | AWS SDK read-safe policy | One reconnect for opening read-safe operations | One reconnect for read-safe operations only |
 | Returned listing cap | Caller limit; zero includes all | Caller limit; zero includes all | Adapter maximum, default 10,000 | Adapter maximum, default 10,000 | Adapter maximum, default 10,000 |
 | Metadata bound | Caller-owned | Not supported | 128 entries / 64 KiB default | Not supported | Not supported |
 
+Local Move remains advertised because overwrite-enabled rename is supported.
+No-overwrite is option-specific: Linux, macOS and Windows use native exclusive
+rename; other targets return a typed `ErrUnsupportedCapability`. Unavailable
+kernel/filesystem primitives fail without moving either entry, returning that
+classification where identifiable or the native error. Files and directories
+retain native rename behavior; admitted symlink entries are renamed, not copied
+or dereferenced. No check-then-rename or link/unlink fallback is used.
+
 `OpenWriter` sends chunks through a bounded pipe to the adapter's normal
 publication path. `Close` waits for the final sync/upload/rename and returns
 that error; dropping a writer without closing it does not publish a successful
-object and can retain the transfer goroutine even after context cancellation.
-Always close an abandoned writer; cancellation does not itself unblock a pipe read.
+object. Cancellation unblocks the adapter-owned pipe; it cannot force borrowed
+callbacks or backend calls to finish. Always close an abandoned writer to join
+publication and cleanup.
 
 An adapter may implement a method so a common conformance type can call it
 while still omitting that capability. Such calls always return

@@ -393,7 +393,7 @@ func (a *Adapter) OpenWriter(ctx context.Context, logicalPath filesystem.Path, o
 	if logicalPath.IsRoot() {
 		return nil, fmt.Errorf("%w: object path is root", filesystem.ErrInvalidPath)
 	}
-	return streamwriter.New(func(source io.Reader) error {
+	return streamwriter.New(ctx, func(source io.Reader) error {
 		_, err := a.Write(ctx, logicalPath, source, options)
 		return err
 	}), nil

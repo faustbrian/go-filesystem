@@ -1,6 +1,7 @@
 package streamwriter
 
 import (
+	"context"
 	"errors"
 	"io"
 	"strings"
@@ -12,7 +13,7 @@ func TestWriterStreamsAndWaitsForConsumer(t *testing.T) {
 	t.Parallel()
 
 	var consumed strings.Builder
-	writer := New(func(source io.Reader) error {
+	writer := New(context.Background(), func(source io.Reader) error {
 		_, err := io.Copy(&consumed, source)
 		return err
 	})
@@ -37,7 +38,7 @@ func TestWriterReturnsConsumerFailureFromClose(t *testing.T) {
 	t.Parallel()
 
 	injected := errors.New("upload failed")
-	writer := New(func(source io.Reader) error {
+	writer := New(context.Background(), func(source io.Reader) error {
 		_, _ = io.Copy(io.Discard, source)
 		return injected
 	})
@@ -52,7 +53,7 @@ func TestWriterReturnsConsumerFailureFromClose(t *testing.T) {
 func TestWriterConcurrentCloseIsStable(t *testing.T) {
 	t.Parallel()
 
-	writer := New(func(source io.Reader) error {
+	writer := New(context.Background(), func(source io.Reader) error {
 		_, err := io.Copy(io.Discard, source)
 		return err
 	})

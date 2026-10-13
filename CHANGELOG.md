@@ -5,6 +5,19 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve racing local Move destinations and concurrent source generations
+  using atomic exclusive rename on Linux, macOS and Windows, retaining
+  directory and admitted symlink behavior. No-overwrite requests fail closed
+  with `ErrUnsupportedCapability` on other targets, or a native/unsupported
+  error when the filesystem cannot provide exclusive rename;
+  overwrite-enabled movement remains available. Handle this option-specific
+  error when offering no-overwrite Move.
+- Preserve content and metadata on overwrite-enabled memory self moves.
+- Cancel adapter-owned streaming-writer pipes and release waiting consumers.
+  Close still joins cleanup; borrowed readers and callbacks remain cooperative.
+
 ### Documentation
 
 - Clarify provider buffering, containment/link limits, publication-error windows,

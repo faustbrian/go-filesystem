@@ -33,7 +33,8 @@ type Writer interface {
 // without weakening its cleanup or error guarantees.
 type WriteOpener interface {
 	// OpenWriter transfers producer ownership. Close signals EOF and waits for the
-	// final publication result; cancellation alone may not unblock a pipe/source Read.
+	// final publication result. Built-in adapters unblock their owned pipe on
+	// cancellation; borrowed callbacks/backend calls can still require cooperation.
 	// Close even after cancellation, and keep options/maps valid until completion.
 	OpenWriter(context.Context, Path, WriteOptions) (io.WriteCloser, error)
 }
@@ -68,8 +69,9 @@ type Copier interface {
 
 // Mover moves an object according to adapter-specific documented guarantees.
 type Mover interface {
-	// Move has provider-specific rename/overwrite guarantees. Equal paths are not
-	// universally a no-op; memory Move with Overwrite true deletes an existing same key.
+	// Move has provider-specific rename/overwrite guarantees. Memory equal-path
+	// overwrite preserves the object; local no-overwrite requires a native exclusive
+	// rename and rejects platforms/filesystems that cannot provide it safely.
 	Move(context.Context, Path, Path, MoveOptions) error
 }
 
