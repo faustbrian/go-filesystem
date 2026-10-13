@@ -6,21 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"unsafe"
 
 	filesystem "github.com/faustbrian/go-filesystem/v2"
 	"golang.org/x/sys/windows"
 )
-
-// fileRenameInformation matches the legacy FILE_RENAME_INFORMATION ABI. The
-// fixed filename storage follows Go's native Renameat implementation; leaf names
-// are bounded by the Windows filesystem component limit.
-type fileRenameInformation struct {
-	ReplaceIfExists byte
-	RootDirectory   windows.Handle
-	FileNameLength  uint32
-	FileName        [syscall.MAX_PATH]uint16
-}
 
 // renameNoReplace uses directory-relative NT handles, opening the source entry
 // itself (including reparse points) rather than following its symlink target.
@@ -39,7 +28,7 @@ func renameNoReplace(source *os.File, sourceName string, destination *os.File, d
 		RootDirectory: windows.Handle(source.Fd()),
 		ObjectName:    objectName,
 	}
-	attributes.Length = uint32(unsafe.Sizeof(attributes))
+	attributes.Length = windowsObjectAttributesLength(windowsPointerBytes)
 	var handle windows.Handle
 	var status windows.IO_STATUS_BLOCK
 	err = windows.NtCreateFile(&handle, windows.SYNCHRONIZE|windows.DELETE, &attributes, &status, nil, 0,
@@ -48,18 +37,16 @@ func renameNoReplace(source *os.File, sourceName string, destination *os.File, d
 	if err != nil {
 		return renameStatusError(err)
 	}
-	defer windows.CloseHandle(handle)
+	defer func() { _ = windows.CloseHandle(handle) }()
 	filename, err := windows.UTF16FromString(destinationName)
 	if err != nil {
 		return err
 	}
-	information := fileRenameInformation{RootDirectory: windows.Handle(destination.Fd())}
-	if len(filename) > len(information.FileName) {
+	if len(filename) > windowsRenameFilenameCapacity {
 		return syscall.EINVAL
 	}
-	copy(information.FileName[:], filename)
-	information.FileNameLength = uint32((len(filename) - 1) * 2)
-	err = windows.NtSetInformationFile(handle, &status, (*byte)(unsafe.Pointer(&information)), uint32(unsafe.Sizeof(information)), windows.FileRenameInformation)
+	information := marshalWindowsRenameInformation(windowsPointerBytes, uint64(destination.Fd()), filename)
+	err = windows.NtSetInformationFile(handle, &status, &information[0], uint32(len(information)), windows.FileRenameInformation)
 	return renameStatusError(err)
 }
 

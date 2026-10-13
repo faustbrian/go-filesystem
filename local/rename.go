@@ -13,12 +13,12 @@ func (r osRoot) RenameNoReplace(source, destination string) error {
 	if err != nil {
 		return err
 	}
-	defer sourceParent.Close()
+	defer func() { _ = sourceParent.Close() }()
 	destinationParent, err := r.root.Open(path.Dir(destination))
 	if err != nil {
 		return err
 	}
-	defer destinationParent.Close()
+	defer func() { _ = destinationParent.Close() }()
 	err = renameNoReplace(sourceParent, path.Base(source), destinationParent, path.Base(destination))
 	if err != nil {
 		return &os.LinkError{Op: "rename-no-replace", Old: source, New: destination, Err: err}

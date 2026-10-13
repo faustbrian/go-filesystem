@@ -37,7 +37,7 @@ func TestMoveSamePathPreservesObject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	content, err := io.ReadAll(stream)
 	if err != nil || string(content) != "content" {
 		t.Fatalf("content=%q err=%v", content, err)

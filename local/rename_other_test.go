@@ -18,7 +18,7 @@ func TestMoveNoOverwriteUnavailablePlatformPreservesSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 	if err := os.WriteFile(filepath.Join(directory, "source"), []byte("content"), 0o600); err != nil {
 		t.Fatal(err)
 	}

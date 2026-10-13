@@ -84,7 +84,7 @@ func TestWriteCancellationDoesNotOwnBorrowedBlockedReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer localAdapter.Close()
+	defer func() { _ = localAdapter.Close() }()
 	for name, adapter := range map[string]filesystem.Writer{"local": localAdapter, "memory": memory.New()} {
 		t.Run(name, func(t *testing.T) {
 			reader := &borrowedBlockedReader{entered: make(chan struct{}), release: make(chan struct{})}

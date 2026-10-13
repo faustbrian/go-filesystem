@@ -62,7 +62,7 @@ func TestMoveNoOverwriteFailureKeepsSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 	if err := os.WriteFile(filepath.Join(directory, "source"), []byte("content"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestMoveNoOverwriteMovesRealFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 	if err := os.WriteFile(filepath.Join(directory, "source"), []byte("content"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestMoveNoOverwritePreservesNewSourceGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 	source := filesystem.MustParsePath("source")
 	if _, err := adapter.Write(context.Background(), source, strings.NewReader("original"), filesystem.WriteOptions{}); err != nil {
 		t.Fatal(err)
@@ -166,7 +166,7 @@ func TestMoveNoOverwritePreservesDirectorySupport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 	if err := os.Mkdir(filepath.Join(directory, "source"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func TestMoveNoOverwriteUnsupportedDoesNotMutate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 	if err := os.WriteFile(filepath.Join(directory, "source"), []byte("content"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func TestMoveNoOverwritePreservesSymlinkEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 	if err := os.WriteFile(filepath.Join(directory, "target"), []byte("target bytes"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestMoveNoOverwriteRejectsEscapingParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 	if err := os.WriteFile(filepath.Join(outside, "source"), []byte("outside bytes"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestMoveNoOverwriteConcurrentSourcesPublishExactlyOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 	const attempts = 8
 	for i := range attempts {
 		name := fmt.Sprintf("source-%d", i)
