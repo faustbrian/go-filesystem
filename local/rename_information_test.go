@@ -67,3 +67,31 @@ func TestMoveWindowsRenameBufferSurrogatePair(t *testing.T) {
 		t.Fatalf("surrogate filename ABI=%x", got[16:28])
 	}
 }
+
+// TestMoveWindowsRenameBufferRejectsInvalidABIInputs prevents truncating a
+// handle or encoding a filename outside the native component storage bound.
+func TestMoveWindowsRenameBufferRejectsInvalidABIInputs(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		pointerBytes int
+		directory    uint64
+		filename     []uint16
+	}{
+		{"pointer width", 3, 0, []uint16{'x', 0}},
+		{"32-bit handle overflow", 4, 1 << 32, []uint16{'x', 0}},
+		{"empty filename", 8, 0, nil},
+		{"oversized filename", 8, 0, make([]uint16, 261)},
+		{"missing terminator", 8, 0, []uint16{'x'}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					t.Errorf("invalid ABI input panicked: %v", recovered)
+				}
+			}()
+			if got := marshalWindowsRenameInformation(test.pointerBytes, test.directory, test.filename); got != nil {
+				t.Fatal("invalid ABI input accepted")
+			}
+		})
+	}
+}

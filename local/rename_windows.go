@@ -46,7 +46,12 @@ func renameNoReplace(source *os.File, sourceName string, destination *os.File, d
 		return syscall.EINVAL
 	}
 	information := marshalWindowsRenameInformation(windowsPointerBytes, uint64(destination.Fd()), filename)
-	err = windows.NtSetInformationFile(handle, &status, &information[0], uint32(len(information)), windows.FileRenameInformation)
+	// The legacy rename ABI occupies at most 544 bytes (64-bit pointer layout).
+	informationLength := len(information)
+	if informationLength < 1 || informationLength > 544 {
+		return syscall.EINVAL
+	}
+	err = windows.NtSetInformationFile(handle, &status, &information[0], uint32(informationLength), windows.FileRenameInformation)
 	return renameStatusError(err)
 }
 
