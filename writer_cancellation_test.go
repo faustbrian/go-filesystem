@@ -33,19 +33,35 @@ func TestOpenWriterCancellationReleasesOwnedPipe(t *testing.T) {
 				t.Fatal(err)
 			}
 			cancel()
-			// A write must fail even if the producer has not supplied EOF via Close.
-			done := make(chan error, 1)
-			go func() { _, err := writer.Write([]byte("more")); done <- err }()
+			// Cancellation closes the pipe asynchronously. A consumer already in
+			// Read may accept this whole chunk before closure; preserve its count.
+			type writeResult struct {
+				count int
+				err   error
+			}
+			done := make(chan writeResult, 1)
+			go func() { n, err := writer.Write([]byte("more")); done <- writeResult{n, err} }()
 			select {
-			case err := <-done:
-				if !errors.Is(err, context.Canceled) {
-					t.Errorf("Write=%v", err)
+			case result := <-done:
+				if result.count < 0 || result.count > len("more") {
+					t.Errorf("invalid Write count=%d", result.count)
+				}
+				if result.err == nil {
+					if result.count != len("more") {
+						t.Errorf("successful Write count=%d", result.count)
+					}
+				} else if !errors.Is(result.err, context.Canceled) {
+					t.Errorf("Write=%v", result.err)
 				}
 			case <-time.After(time.Second):
 				t.Error("cancellation did not unblock owned pipe")
 			}
 			if err := writer.Close(); !errors.Is(err, context.Canceled) {
 				t.Errorf("Close=%v", err)
+			}
+			// Joined cleanup establishes closure even when the racing chunk succeeded.
+			if n, err := writer.Write([]byte("after cleanup")); n != 0 || !errors.Is(err, context.Canceled) {
+				t.Errorf("Write after cleanup=%d, %v", n, err)
 			}
 			if statter, ok := adapter.(filesystem.Statter); ok {
 				if _, err := statter.Stat(context.Background(), filesystem.MustParsePath("object")); !errors.Is(err, filesystem.ErrNotFound) {
