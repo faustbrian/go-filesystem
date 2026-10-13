@@ -20,7 +20,7 @@ decorators, and conformance helpers. It does not select an application storage
 policy or erase backend-specific consistency, atomicity, durability,
 permissions, or retry behavior.
 
-The published v2.0.1 release requires Go 1.27.0 or newer. Production code
+The v2 API requires Go 1.27.0 or newer. Production code
 stays at the repository root on main; the `/v2` suffix is Go's major-version
 module identity, not a version-specific source directory or branch. The legacy
 `v1.1.0` release introduced additive context-aware acquisition APIs.
@@ -37,8 +37,12 @@ and [integration and data movement family guidance](https://github.com/faustbria
 ## Installation
 
 ```sh
-go get github.com/faustbrian/go-filesystem/v2@v2.0.1
+go get github.com/faustbrian/go-filesystem/v2@v2
 ```
+
+For the Move and streaming-writer corrections in v2.0.2, adopt that version
+or newer after publication. Review the [adapter adoption guide](docs/adapters.md#upgrading-to-v202)
+for no-overwrite platform availability and cancellation ownership.
 
 ## Quick start
 
@@ -242,7 +246,7 @@ include the [API reference](https://pkg.go.dev/github.com/faustbrian/go-filesyst
 
 ## Status
 
-Version 2 is published at `v2.0.1`. Compatibility commitments and tested
+Version 2 is the current major API. Compatibility commitments and tested
 services are recorded in [COMPATIBILITY.md](COMPATIBILITY.md). Google Cloud
 Storage and Azure Blob Storage are intentionally outside the initial release.
 

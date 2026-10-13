@@ -5,6 +5,8 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-10-13
+
 ### Fixed
 
 - Preserve racing local Move destinations and concurrent source generations
@@ -17,6 +19,12 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
 - Preserve content and metadata on overwrite-enabled memory self moves.
 - Cancel adapter-owned streaming-writer pipes and release waiting consumers.
   Close still joins cleanup; borrowed readers and callbacks remain cooperative.
+  [41488dc6ef](https://github.com/faustbrian/go-filesystem/commit/41488dc6ef6e7beba3a36f804ef99c26ca7532fd)
+- Encode Windows exclusive-rename arguments without unsafe casts, validating
+  handle widths, UTF-16 component bounds and native buffer lengths before
+  narrowing ABI fields.
+  [8ba0396558](https://github.com/faustbrian/go-filesystem/commit/8ba039655828fbaa96b5b569173f3c708189057c),
+  [313c7280bd](https://github.com/faustbrian/go-filesystem/commit/313c7280bd0b7fb8b79eb8eb3a78510ea19ad5ce)
 
 ### Documentation
 
@@ -24,6 +32,32 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
   stream close ownership and cancellation boundaries without changing IO behavior.
 - Document checksum retry/observer privacy, local no-clobber move races and
   memory same-path move behavior rather than implying uniform guarantees.
+  [8e3aec85d1](https://github.com/faustbrian/go-filesystem/commit/8e3aec85d15358f5cc0f5bf43f1a06d912615cf7)
+- Make standalone adoption and package navigation discoverable and identify
+  the published v2 module without implying that unpublished source is released.
+  [d01529c88f](https://github.com/faustbrian/go-filesystem/commit/d01529c88f566c5799b1657f83b48c4943a82f3e),
+  [089e24eafa](https://github.com/faustbrian/go-filesystem/commit/089e24eafa9c5b69d43da0b32816656410794ad4)
+- Explain exact scanner conversion and checksum proofs at the security boundary.
+  [96c1ea56c3](https://github.com/faustbrian/go-filesystem/commit/96c1ea56c3e6ebf5c475d2a9defbfa1c5ea56400)
+
+### Maintenance
+
+- Enforce source-documentation contracts with authenticated shared tooling,
+  incorporating the earlier supply-chain tooling update.
+  [a51aefa298](https://github.com/faustbrian/go-filesystem/commit/a51aefa29844341a6f47a3ba828f6a2b883c31c0),
+  [94274684ae](https://github.com/faustbrian/go-filesystem/commit/94274684ae28654c1ea5cb5161423a6483c4df1c)
+- Use bounded ordinary verification and selected scheduled assurance, retaining
+  explicit full release qualification.
+  [a0062df58c](https://github.com/faustbrian/go-filesystem/commit/a0062df58cbddc38be8370bf1b80bdb829d8676a),
+  [851c409b6d](https://github.com/faustbrian/go-filesystem/commit/851c409b6d5e21038018d3541b081882b7fe0b99)
+- Standardize repository development policy.
+  [c61789cb9b](https://github.com/faustbrian/go-filesystem/commit/c61789cb9b8eaa16381d293390d283154f77b758)
+- Build verification with Go 1.27.2 and patched documentation tooling while
+  retaining the Go 1.27.0 module language minimum.
+  [3dedc082a2](https://github.com/faustbrian/go-filesystem/commit/3dedc082a2092544cbbcaa9e56595ef4be502cf4)
+- Refresh the unpublished internal ingestion harness to Tabular v2.0.2 and its
+  public parser security patches; this does not release the nested module.
+  [af3cf3172f](https://github.com/faustbrian/go-filesystem/commit/af3cf3172f93a89b64969db7a7c1908e4225481b)
 
 ## [2.0.1] - 2026-10-08
 
@@ -205,6 +239,7 @@ format follows Keep a Changelog and the project uses Semantic Versioning.
   the pinned protocol client cannot safely complete protected data transfers.
   Plaintext passive and active modes are covered by real transfer tests.
 
+[2.0.2]: https://github.com/faustbrian/go-filesystem/compare/v2.0.1...v2.0.2
 [2.0.0]: https://github.com/faustbrian/go-filesystem/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/faustbrian/go-filesystem/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/faustbrian/go-filesystem/releases/tag/v1.0.0

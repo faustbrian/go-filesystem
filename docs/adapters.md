@@ -2,6 +2,25 @@
 
 [Documentation index](README.md) · [Repository entry](../README.md)
 
+## Upgrading to v2.0.2
+
+After publication, adopt `github.com/faustbrian/go-filesystem/v2@v2.0.2` or
+newer for the local/memory Move and streaming-writer corrections. The module
+identity and Go 1.27.0 minimum are unchanged.
+
+Local no-overwrite Move now uses exclusive native rename on Linux, macOS and
+Windows. Other targets fail closed with `ErrUnsupportedCapability`; unavailable
+kernel/filesystem support can return that classification or a native error.
+Advertising Move capability does not guarantee every option is available.
+Handle this option-specific failure when offering no-overwrite movement;
+overwrite-enabled Move remains available on targets supported by `os.Root`.
+
+Cancellation closes adapter-owned streaming-writer pipes and releases waiting
+consumers. Call `Close` and inspect its result to join cleanup and publication.
+This does not close borrowed `Write` readers or force blocked callbacks,
+mutex acquisition or network backends to stop; those boundaries remain
+cooperative. Overwrite-enabled memory self moves preserve their existing object.
+
 ## Memory
 
 Use `memory.New()` for deterministic tests and ephemeral data. It is safe for
