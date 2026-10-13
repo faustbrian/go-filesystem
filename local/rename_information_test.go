@@ -95,3 +95,13 @@ func TestMoveWindowsRenameBufferRejectsInvalidABIInputs(t *testing.T) {
 		})
 	}
 }
+
+// TestMoveWindowsInvalidPointerWidthHasNoNativeLayout rejects non-ABI widths
+// rather than manufacturing an OBJECT_ATTRIBUTES length for an NT call.
+func TestMoveWindowsInvalidPointerWidthHasNoNativeLayout(t *testing.T) {
+	for _, width := range []int{0, 3, 16} {
+		if windowsObjectAttributesLength(width) != 0 || marshalWindowsRenameInformation(width, 0, []uint16{'x', 0}) != nil {
+			t.Fatal("invalid pointer width produced native attributes or rename data")
+		}
+	}
+}
