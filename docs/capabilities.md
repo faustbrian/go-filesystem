@@ -26,7 +26,7 @@ server feature, and `-` means a typed unsupported-capability error.
 
 | Property | Memory | Local | S3/R2 | SFTP | FTP |
 |---|---|---|---|---|---|
-| Write publication | Atomic under adapter lock | Temporary file plus rename/create-only link | Object PUT/multipart completion | Temporary file plus rename | Temporary upload plus rename after an absence precheck |
+| Write publication | Atomic under adapter lock | Temporary file plus rename/create-only link | Object PUT/multipart completion | Temporary file plus rename | Temporary upload plus rename after a preliminary absence check |
 | Rename | Locked map update; equal-path overwrite is a no-op | OS rename; native exclusive rename without overwrite where available | No rename primitive | Only advertised with `posix-rename@openssh.com` | Not advertised |
 | Consistency | Immediate | Host filesystem | Service contract | Server filesystem | Server filesystem |
 | Retry policy | None needed | None | AWS SDK read-safe policy | One reconnect for opening read-safe operations | One reconnect for read-safe operations only |
