@@ -3,18 +3,18 @@ module github.com/faustbrian/go-filesystem/v2
 go 1.27.0
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.47.1
+	github.com/aws/aws-sdk-go-v2 v1.47.3
 	github.com/aws/aws-sdk-go-v2/config v1.33.3
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.3
 	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.4.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.1
-	github.com/aws/smithy-go v1.28.1
+	github.com/aws/smithy-go v1.28.5
 	github.com/fclairamb/ftpserverlib v0.32.4
 	github.com/gonzalop/ftp v1.6.1
 	github.com/pkg/sftp v1.13.11
 	github.com/spf13/afero v1.15.0
-	golang.org/x/crypto v0.56.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/crypto v0.57.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
@@ -32,5 +32,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.42.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.49.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )
